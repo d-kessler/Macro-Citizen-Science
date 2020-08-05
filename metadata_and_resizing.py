@@ -12,21 +12,25 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 def configure():
     """Get file & slab information, create new folder for images, configure excel & csv files"""
-    global image_folder_path, excel_file_path, warehouse_name, granite_type, slab_id, \
+    global subject_set_id, image_folder_path, excel_file_path, warehouse_name, location, granite_type, slab_id, \
         resized_folder_path, csv_file_name, csv_file_path, metadata_fields, wb, ws, first_empty_row
+    
+    subject_set_id = 86450
 
-    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
-    # excel_file_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Experiment_Manifest.xlsx"
-    # warehouse_name = 'United Stone International'
-    # granite_type = 'Dallas White'
-    # slab_id = '1151|20'
+    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
+    excel_file_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Experiment_Manifest.xlsx"
+    warehouse_name = 'United Stone International'
+    location = 'Solon, Ohio'
+    granite_type = 'Dallas White'
+    slab_id = '1151|20'
 
-    # getting user input for metadata fields
-    image_folder_path = input('Enter the folder path: ')
-    excel_file_path = input('Excel file path: ')
-    warehouse_name = input('Warehouse name: ')
-    granite_type = input('Granite type: ')
-    slab_id = input('Slab ID: ')
+    # # getting user input for metadata fields
+    # image_folder_path = input('Enter the folder path: ')
+    # excel_file_path = input('Excel file path: ')
+    # warehouse_name = input('Warehouse name: ')
+    # location = input('Location (City, State): ')
+    # granite_type = input('Granite type: ')
+    # slab_id = input('Slab ID: ')
 
     # creating a folder for resized images
     resized_folder_path = os.path.join(image_folder_path, r"resized-" + os.path.basename(image_folder_path))
@@ -48,7 +52,7 @@ def configure():
     csv_file_path = os.path.join(resized_folder_path, csv_file_name)
 
     with open(csv_file_path, 'w', newline='') as f:
-        metadata_fields = ['!subject_id', '#file_name', '#warehouse', '#granite_type', '#slab_id', '#date_time',
+        metadata_fields = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id', '#date_time',
                            '#latitude_longitude']
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
         csv_writer.writeheader()
@@ -77,7 +81,7 @@ def get_date(exif_dict):
         has_date = 1
 
         return date, has_date
-    
+
     except:
         pass
 
@@ -162,30 +166,32 @@ def resize_to_limit(image_file_path_, resized_file_path_, size_limit=600000):
 
 
 def write_metadata_into_excel():
-    
+
     ws.cell(row=i, column=1).value = subject_id
     ws.cell(row=i, column=2).value = str(resized_file_name)
     ws.cell(row=i, column=3).value = warehouse_name
-    ws.cell(row=i, column=4).value = granite_type
-    ws.cell(row=i, column=5).value = slab_id
+    ws.cell(row=i, column=4).value = location
+    ws.cell(row=i, column=5).value = granite_type
+    ws.cell(row=i, column=6).value = slab_id
     if has_date == 1:
-        ws.cell(row=i, column=6).value = date.replace("\"", "")
+        ws.cell(row=i, column=7).value = date.replace("\"", "")
     elif has_date == 0:
-        ws.cell(row=i, column=6).value = '-'
-    if has_gps == 1:
-        ws.cell(row=i, column=7).value = str(latitude) + ', ' + str(longitude)
-    elif has_gps == 0:
         ws.cell(row=i, column=7).value = '-'
+    if has_gps == 1:
+        ws.cell(row=i, column=8).value = str(latitude) + ', ' + str(longitude)
+    elif has_gps == 0:
+        ws.cell(row=i, column=8).value = '-'
 
 
 def write_metadata_into_csv():
-    
+
     with open(csv_file_path, 'a', newline='') as f:
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
 
         row = {'!subject_id': subject_id}
         row['#file_name'] = str(resized_file_name)
         row['#warehouse'] = warehouse_name
+        row['#location'] = location
         row['#granite_type'] = granite_type
         row['#slab_id'] = slab_id
         if has_date == 1:
@@ -206,7 +212,7 @@ get_file_names()
 # resize images, get and fill metadata into excel file & csv
 i = first_empty_row
 for filename in file_names:
-    
+
     subject_id = 'e' + str(i - 1)
     resized_file_name = r"res-" + filename
 
@@ -234,5 +240,5 @@ for filename in file_names:
 wb.save(excel_file_path)
 
 print(
-    '\nTo upload subjects, \nEnter into the command line: \n    chdir {}\n\nFollowed by: \n    panoptes subject-set upload-subjects 86450 {}'.format(
-        resized_folder_path, csv_file_name))
+    '\nTo upload subjects, \nEnter into the command line: \n    chdir {}\n\nFollowed by: \n    panoptes subject-set upload-subjects {} {}'.format(
+        resized_folder_path, subject_set_id, csv_file_name))
