@@ -11,12 +11,12 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 
 def configure():
+    """Get file & slab information, create new folder for images, configure excel & csv files"""
     global image_folder_path, excel_file_path, warehouse_name, granite_type, slab_id, \
         resized_folder_path, csv_file_name, csv_file_path, metadata_fields, wb, ws, first_empty_row
 
     # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
     # excel_file_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Experiment_Manifest.xlsx"
-    #
     # warehouse_name = 'United Stone International'
     # granite_type = 'Dallas White'
     # slab_id = '1151|20'
@@ -35,7 +35,7 @@ def configure():
     except:
         print('Resized Folder Exists.')
 
-    # configuring excel file; finding first empty row
+    # configuring excel file, finding first empty row
     wb = openpyxl.load_workbook(filename=excel_file_path)
     ws = wb['Sheet1']
     for cell in ws["B"]:
@@ -43,7 +43,7 @@ def configure():
             first_empty_row = cell.row
             break
 
-    # configuring csv file in resized folder
+    # configuring csv file, saving in resized images folder
     csv_file_name = 'experiment_subjects_csv.csv'
     csv_file_path = os.path.join(resized_folder_path, csv_file_name)
 
@@ -55,7 +55,7 @@ def configure():
 
 
 def get_file_names():
-    """creating a list of image file directories"""
+    """Create a list of image files in given directory"""
     global file_names
 
     all_file_names = os.listdir(image_folder_path)
@@ -66,6 +66,7 @@ def get_file_names():
 
 
 def get_date(exif_dict):
+    """Get date/time image exif data (if available)"""
     global date, has_date
     date = ''
     has_date = 0
@@ -76,12 +77,13 @@ def get_date(exif_dict):
         has_date = 1
 
         return date, has_date
-
+    
     except:
         pass
 
 
 def get_gps(exif_dict):
+    """Get GPS image exif data (if available)"""
     global latitude, longitude, has_gps
     latitude = []
     longitude = []
@@ -90,9 +92,7 @@ def get_gps(exif_dict):
     gps_dict = {}
     try:
         for key in exif_dict['GPSInfo'].keys():
-            # print('{} has GPS data'.format(filename))
             gps_tag = ExifTags.GPSTAGS.get(key)
-            # print(gps_tag)
             gps_dict[gps_tag] = exif_dict['GPSInfo'][key]
 
         latitude_raw = gps_dict.get('GPSLatitude')
@@ -120,6 +120,7 @@ def get_gps(exif_dict):
 
 
 def convert_to_degrees(value):
+    """Convert GPS exif data to latitude/longitude degree format"""
     d0 = value[0][0]
     d1 = value[0][1]
     d = float(d0) / float(d1)
@@ -136,6 +137,7 @@ def convert_to_degrees(value):
 
 
 def resize_to_limit(image_file_path_, resized_file_path_, size_limit=600000):
+    """Resize images to size_limit, save to new file"""
     img = img_orig = Image.open(image_file_path_)
     img_exif = img.info['exif']
     aspect = img.size[0] / img.size[1]
@@ -149,22 +151,18 @@ def resize_to_limit(image_file_path_, resized_file_path_, size_limit=600000):
         # print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
 
         if size_deviation <= 1:
-            # filesize fits
-            # with open(img_target_filename, "wb") as f:
-            #     f.write(data)
             img.save(resized_file_path_, exif=img_exif)
             # print(img.size[0], img.size[1])
             break
         else:
-            # filesize not good enough => adapt width and height
-            # use sqrt of deviation since applied both in width and height
             new_width = img.size[0] / (1 * (size_deviation ** 0.5))
             new_height = new_width / aspect
-            # resize from img_orig to not lose quality
+
             img = img_orig.resize((int(new_width), int(new_height)))
 
 
 def write_metadata_into_excel():
+    
     ws.cell(row=i, column=1).value = subject_id
     ws.cell(row=i, column=2).value = str(resized_file_name)
     ws.cell(row=i, column=3).value = warehouse_name
@@ -181,6 +179,7 @@ def write_metadata_into_excel():
 
 
 def write_metadata_into_csv():
+    
     with open(csv_file_path, 'a', newline='') as f:
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
 
@@ -204,11 +203,11 @@ def write_metadata_into_csv():
 configure()
 get_file_names()
 
-# resizing images, getting and filling metadata into excel file & csv
+# resize images, get and fill metadata into excel file & csv
 i = first_empty_row
 for filename in file_names:
+    
     subject_id = 'e' + str(i - 1)
-
     resized_file_name = r"res-" + filename
 
     image_file_path = os.path.join(image_folder_path, filename)
@@ -224,14 +223,14 @@ for filename in file_names:
 
     get_gps(exif)
 
-    # write_metadata_into_excel()
+    write_metadata_into_excel()
     write_metadata_into_csv()
 
     print('{} of {} completed.'.format((file_names.index(filename) + 1), len(file_names)))
 
     i += 1
 
-# saving excel manifest --- the excel file must be closed
+# save excel manifest --- the excel file must be closed
 wb.save(excel_file_path)
 
 print(
