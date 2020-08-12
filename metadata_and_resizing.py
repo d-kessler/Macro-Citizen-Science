@@ -13,7 +13,7 @@ import image_slicer
 
 def configure():
     """Get file & slab information, create new folder for images, configure excel & csv files"""
-    global subject_set_id, image_folder_path, excel_file_path, warehouse_name, location, granite_type, slab_id, should_crop_into_four,\
+    global subject_set_id, image_folder_path, excel_file_path, warehouse_name, location, granite_type, slab_id, should_crop_into_four, \
         cropped_folder_path, resized_folder_path, csv_file_name, csv_file_path, metadata_fields, wb, ws, first_empty_row
 
     subject_set_id = 86450
@@ -68,109 +68,89 @@ def configure():
         csv_writer.writeheader()
 
 
-def get_file_names():
+def get_file_names(image_folder_path_):
     """Create a list of image files in given directory"""
     global file_names
 
-    all_file_names = os.listdir(image_folder_path)
+    all_file_names = os.listdir(image_folder_path_)
     file_names = []
     for file in all_file_names:
         if file.endswith(".jpeg") or file.endswith(".jpg") or file.endswith(".png"):
             file_names.append(file)
 
 
-def crop_into_four(pil_file_):
-    global cropped_file_paths, resized_file_paths
+def crop_into_four():
+    global image_folder_path, cropped_file_paths, resized_file_paths
 
-    cropped_file_paths = []
-    resized_file_paths = []
+    for filename_ in file_names:
+        image_file_path_ = os.path.join(image_folder_path, filename_)
+        cropped_file_path = os.path.join(cropped_folder_path, filename_)
+        extension = os.path.splitext(filename_)[-1]
 
-    width, height = pil_file_.size
+        pil_file_ = Image.open(image_file_path_)
+        image_exif_ = pil_file_.info['exif']
 
-    half_width = width / 2
-    half_height = height / 2
+        width, height = pil_file_.size
 
-    # starting from top left (0,0) and moving clockwise
-    # (left, top, right, bottom)
-    section_1 = (0, 0, half_width, half_height)
-    section_2 = (half_width, 0, width, half_height)
-    section_3 = (half_width, half_height, width, height)
-    section_4 = (0, half_height, half_width, height)
+        half_width = width / 2
+        half_height = height / 2
 
-    for i in range(1, 5):
-        im = pil_file_
+        # starting from top left (0,0) and moving clockwise
+        # (left, top, right, bottom)
+        section_1 = (0, 0, half_width, half_height)
+        section_2 = (half_width, 0, width, half_height)
+        section_3 = (half_width, half_height, width, height)
+        section_4 = (0, half_height, half_width, height)
 
-        if i == 1:
-            im = im.crop(section_1)
-        if i == 2:
-            im = im.crop(section_2)
-        if i == 3:
-            im = im.crop(section_3)
-        if i == 4:
-            im = im.crop(section_4)
+        for j in range(1, 5):
+            im = pil_file_
+
+            if j == 1:
+                im = im.crop(section_1)
+            if j == 2:
+                im = im.crop(section_2)
+            if j == 3:
+                im = im.crop(section_3)
+            if j == 4:
+                im = im.crop(section_4)
+
+            reformatted_cropped_file_path = cropped_file_path.replace(str(extension),
+                                                                      "_{}{}".format(str(j), str(extension)))
+
+            im = im.save(reformatted_cropped_file_path, exif=image_exif_)
+
+    get_file_names(cropped_folder_path)
+    image_folder_path = cropped_folder_path
 
 
-        reformatted_cropped_file_path = cropped_file_path.replace(str(extension), "_{}{}".format(str(i), str(extension)))
-        reformatted_resized_file_path = resized_file_path.replace(str(extension), "_{}{}".format(str(i), str(extension)))
-
-        cropped_file_paths.append(reformatted_cropped_file_path)
-        resized_file_paths.append(reformatted_resized_file_path)
-
-        im = im.save(reformatted_cropped_file_path, exif=image_exif)
-
-
-def resize_to_limit(image_file_path_=None, resized_file_path_=None, size_limit=600000):
+def resize_to_limit(image_file_path_=None, size_limit=600000):
     """Resize images to size_limit, save to new file"""
-    # add conditional for should_resize
+    global resized_file_name, resized_file_path
 
-    if should_crop_into_four == 'yes':
+    resized_file_name = r"res_" + filename
+    resized_file_path = os.path.join(resized_folder_path, resized_file_name)
 
-        for cropped_file in cropped_file_paths:
-            index = list.index(cropped_file_paths, cropped_file)
+    img = Image.open(image_file_path_)
+    img_exif = img.info['exif']
+    aspect = img.size[0] / img.size[1]
 
-            img = Image.open(cropped_file)
-            aspect = img.size[0] / img.size[1]
+    while True:
+        with io.BytesIO() as buffer:
+            img.save(buffer, format="JPEG")
+            data = buffer.getvalue()
+        filesize = len(data)
+        size_deviation = filesize / size_limit
+        # print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
 
-            while True:
-                with io.BytesIO() as buffer:
-                    img.save(buffer, format="JPEG")
-                    data = buffer.getvalue()
-                filesize = len(data)
-                size_deviation = filesize / size_limit
-                print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
+        if size_deviation <= 1:
+            img.save(resized_file_path, exif=img_exif)
+            break
+        else:
+            new_width = img.size[0] / (1 * (size_deviation ** 0.5))
+            new_height = new_width / aspect
 
-                if size_deviation <= 1:
-                    img.save(resized_file_paths[index], exif=image_exif)
-                    print(cropped_file + '\nsaved to\n' + resized_file_paths[index])
-                    # print(img.size[0], img.size[1])
-                    break
-                else:
-                    new_width = img.size[0] / (1 * (size_deviation ** 0.5))
-                    new_height = new_width / aspect
+            img = img.resize((int(new_width), int(new_height)))
 
-                    img = img.resize((int(new_width), int(new_height)))
-    else:
-        img = img_orig = Image.open(image_file_path_)
-        img_exif = img.info['exif']
-        aspect = img.size[0] / img.size[1]
-
-        while True:
-            with io.BytesIO() as buffer:
-                img.save(buffer, format="JPEG")
-                data = buffer.getvalue()
-            filesize = len(data)
-            size_deviation = filesize / size_limit
-            # print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
-
-            if size_deviation <= 1:
-                img.save(resized_file_path_, exif=img_exif)
-                # print(img.size[0], img.size[1])
-                break
-            else:
-                new_width = img.size[0] / (1 * (size_deviation ** 0.5))
-                new_height = new_width / aspect
-
-                img = img_orig.resize((int(new_width), int(new_height)))
 
 def get_date(exif_dict):
     """Get date/time image exif data (if available)"""
@@ -283,29 +263,25 @@ def write_metadata_into_csv():
 
 
 configure()
-get_file_names()
+get_file_names(image_folder_path)
 
-# crop (if applicable) and resize images, get and fill metadata into excel file & csv
+# crop images if needed
+if should_crop_into_four == 'yes':
+    crop_into_four()
+
+# resize images, get and fill metadata into excel file & csv
 i = first_empty_row
+
 for filename in file_names:
     subject_id = 'e' + str(i - 1)
-    extension = os.path.splitext(filename)[-1]
-
-    resized_file_name = r"res-" + filename
 
     image_file_path = os.path.join(image_folder_path, filename)
-    cropped_file_path = os.path.join(cropped_folder_path, filename)
-    resized_file_path = os.path.join(resized_folder_path, resized_file_name)
 
     # creating PIL instance
     pil_file = Image.open(image_file_path)
     image_exif = pil_file.info['exif']
 
-    if should_crop_into_four == 'yes':
-        crop_into_four(pil_file)
-        resize_to_limit()
-    else:
-        resize_to_limit(image_file_path, resized_file_path)
+    resize_to_limit(image_file_path)
 
     # getting image exif data
     exif = {ExifTags.TAGS[k]: v for k, v in pil_file._getexif().items() if k in ExifTags.TAGS}
