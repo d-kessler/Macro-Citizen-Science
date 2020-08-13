@@ -14,7 +14,7 @@ experiment_subjects = SubjectSet.find(experiment_subjects_id)
 experiment_subjects.save()
 
 simulated_subjects_id = 86778
-training_subjects = SubjectSet.find(simulated_subjects_id)
+simulated_subjects = SubjectSet.find(simulated_subjects_id)
 simulated_subjects.save()
 
 negative_subjects_id = 86840
@@ -24,7 +24,7 @@ negative_subjects.save()
 # Designator
 workflow_id = 14437
 workflow = Workflow.find(workflow_id)
-workflow.configuration['training_set_ids'] = [simuated_subjects_id, negative_subjects_id]
+workflow.configuration['training_set_ids'] = [simulated_subjects_id, negative_subjects_id]
 workflow.configuration['training_chances'] = [[0.40] * 50, [0.20] * 50]
 workflow.configuration['training_default_chances'] = [0.1]
 workflow.configuration['subject_queue_page_size'] = 50 # determines how many subjects are loaded in queue at one time; set to 50 to match training_chances

@@ -3,18 +3,18 @@ import os
 import io
 import json
 import csv
+import image_slicer
 import openpyxl
-from PIL import Image, ExifTags
+from PIL import Image, ImageDraw, ExifTags
 from pathlib import Path
 from datetime import datetime
 from panoptes_client import Panoptes, Project, SubjectSet, Subject
-import image_slicer
 
 
 def configure():
     """Get file & slab information, create new folder for images, configure excel & csv files"""
     global subject_set_id, image_folder_path, excel_file_path, warehouse_name, location, granite_type, slab_id, should_crop_into_four, \
-        cropped_folder_path, resized_folder_path, csv_file_name, csv_file_path, metadata_fields, wb, ws, first_empty_row
+        cropped_folder_path, processed_folder_path, csv_file_name, csv_file_path, metadata_fields, wb, ws, first_empty_row
 
     subject_set_id = 86450
 
@@ -25,8 +25,9 @@ def configure():
     # location = input('Location (City, State): ')
     # granite_type = input('Granite type: ')
     # slab_id = input('Slab ID: ')
-    should_crop_into_four = input('Should the images be cropped into 4 parts? Enter \'yes\' or \'no\' :  ')
+    should_crop_into_four = input('Should the images be cropped into 4 parts? Enter \'yes\' or \'no\':  ')
 
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
     image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 12x16 no flash - Copy"
     excel_file_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Experiment_Manifest.xlsx"
     warehouse_name = 'United Stone International'
@@ -41,24 +42,24 @@ def configure():
     except:
         print('Cropped Folder Exists.')
 
-    # creating a folder for resized images
-    resized_folder_path = os.path.join(image_folder_path, r"resized_" + os.path.basename(image_folder_path))
+    # creating a folder for processed images
+    processed_folder_path = os.path.join(image_folder_path, r"processed_" + os.path.basename(image_folder_path))
     try:
-        os.mkdir(resized_folder_path)
+        os.mkdir(processed_folder_path)
     except:
-        print('Resized Folder Exists.')
+        print('Processed Folder Exists.')
 
     # configuring excel file, finding first empty row
     wb = openpyxl.load_workbook(filename=excel_file_path)
     ws = wb['Sheet1']
-    for cell in ws["B"]:
-        if cell.value is None:
-            first_empty_row = cell.row
+    for row in range(1, int(1e10)):
+        if ws.cell(row, 1).value is None:
+            first_empty_row = row
             break
 
-    # configuring csv file, saving in resized images folder
+    # configuring csv file, saving in processed images folder
     csv_file_name = 'experiment_subjects_csv.csv'
-    csv_file_path = os.path.join(resized_folder_path, csv_file_name)
+    csv_file_path = os.path.join(processed_folder_path, csv_file_name)
 
     with open(csv_file_path, 'w', newline='') as f:
         metadata_fields = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
@@ -80,7 +81,7 @@ def get_file_names(image_folder_path_):
 
 
 def crop_into_four():
-    global image_folder_path, cropped_file_paths, resized_file_paths
+    global image_folder_path
 
     for filename_ in file_names:
         image_file_path_ = os.path.join(image_folder_path, filename_)
@@ -123,12 +124,8 @@ def crop_into_four():
     image_folder_path = cropped_folder_path
 
 
-def resize_to_limit(image_file_path_=None, size_limit=600000):
+def resize_to_limit(image_file_path_, size_limit=600000):
     """Resize images to size_limit, save to new file"""
-    global resized_file_name, resized_file_path
-
-    resized_file_name = r"res_" + filename
-    resized_file_path = os.path.join(resized_folder_path, resized_file_name)
 
     img = Image.open(image_file_path_)
     img_exif = img.info['exif']
@@ -143,7 +140,7 @@ def resize_to_limit(image_file_path_=None, size_limit=600000):
         # print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
 
         if size_deviation <= 1:
-            img.save(resized_file_path, exif=img_exif)
+            img.save(processed_file_path, exif=img_exif)
             break
         else:
             new_width = img.size[0] / (1 * (size_deviation ** 0.5))
@@ -225,7 +222,7 @@ def convert_to_degrees(value):
 
 def write_metadata_into_excel():
     ws.cell(row=i, column=1).value = subject_id
-    ws.cell(row=i, column=2).value = str(resized_file_name)
+    ws.cell(row=i, column=2).value = str(processed_file_name)
     ws.cell(row=i, column=3).value = warehouse_name
     ws.cell(row=i, column=4).value = location
     ws.cell(row=i, column=5).value = granite_type
@@ -245,7 +242,7 @@ def write_metadata_into_csv():
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
 
         row = {'!subject_id': subject_id}
-        row['#file_name'] = str(resized_file_name)
+        row['#file_name'] = str(processed_file_name)
         row['#warehouse'] = warehouse_name
         row['#location'] = location
         row['#granite_type'] = granite_type
@@ -262,38 +259,91 @@ def write_metadata_into_csv():
         csv_writer.writerow(row)
 
 
+def draw_scale_bar(pil_file_, image_exif_):
+    im = pil_file_
+    pix_width, pix_height = im.size
+
+    inch_to_mm_conversion = 25.4
+    true_height = 6 * inch_to_mm_conversion
+    true_width = 8 * inch_to_mm_conversion
+
+    mm_per_pix = true_height / pix_height
+
+    five_mm = 5 / mm_per_pix
+
+    scale_bar_pix_length1 = 1 / mm_per_pix  # (1mm) / (mm/pix) = pix in 1mm
+    scale_bar_pix_length2 = 2 / mm_per_pix
+    scale_bar_pix_length3 = 3 / mm_per_pix
+    scale_bar_pix_length4 = 4 / mm_per_pix
+    scale_bar_pix_length5 = 5 / mm_per_pix
+    scale_bar_pix_length10 = 10 / mm_per_pix
+
+    scale_bar1_pix_coords = [(pix_width / 2 - 3 * five_mm, pix_height / 2),
+                             (pix_width / 2 - 3 * five_mm,
+                              pix_height / 2 + scale_bar_pix_length1)]  # [(start x, start y), (end x, end y)]
+    scale_bar2_pix_coords = [(pix_width / 2 - 2 * five_mm, pix_height / 2),
+                             (pix_width / 2 - 2 * five_mm, pix_height / 2 + scale_bar_pix_length2)]
+    scale_bar3_pix_coords = [(pix_width / 2 - 1 * five_mm, pix_height / 2),
+                             (pix_width / 2 - 1 * five_mm, pix_height / 2 + scale_bar_pix_length3)]
+    scale_bar4_pix_coords = [(pix_width / 2, pix_height / 2),
+                             (pix_width / 2, pix_height / 2 + scale_bar_pix_length4)]
+    scale_bar5_pix_coords = [(pix_width / 2 + 1 * five_mm, pix_height / 2),
+                             (pix_width / 2 + 1 * five_mm, pix_height / 2 + scale_bar_pix_length5)]
+    scale_bar10_pix_coords = [(pix_width / 2 + 2 * five_mm, pix_height / 2),
+                              (pix_width / 2 + 2 * five_mm, pix_height / 2 + scale_bar_pix_length10)]
+
+    yellow = (234, 255, 5)  # (R, G, B)
+
+    draw = ImageDraw.Draw(im)
+
+    draw.line(scale_bar1_pix_coords, fill=yellow, width=10)
+    draw.line(scale_bar2_pix_coords, fill=yellow, width=10)
+    draw.line(scale_bar3_pix_coords, fill=yellow, width=10)
+    draw.line(scale_bar4_pix_coords, fill=yellow, width=10)
+    draw.line(scale_bar5_pix_coords, fill=yellow, width=10)
+    draw.line(scale_bar10_pix_coords, fill=yellow, width=10)
+
+    im.save(processed_file_path, exif=image_exif_)
+
+
 configure()
 get_file_names(image_folder_path)
 
-# crop images if needed
+# cropping images, saving to new folder (if needed)
 if should_crop_into_four == 'yes':
     crop_into_four()
 
-# resize images, get and fill metadata into excel file & csv
+# resizing images, getting and filling metadata into excel file & csv
 i = first_empty_row
 
 for filename in file_names:
+    # subject id to be written into excel & csv files
     subject_id = 'e' + str(i - 1)
 
     image_file_path = os.path.join(image_folder_path, filename)
+    processed_file_name = r"proc_" + filename
+    processed_file_path = os.path.join(processed_folder_path, processed_file_name)
 
     # creating PIL instance
     pil_file = Image.open(image_file_path)
     image_exif = pil_file.info['exif']
 
-    resize_to_limit(image_file_path)
+    # drawing scale bar on image
+    draw_scale_bar(pil_file, image_exif)
+
+    # resizing, saving to new folder
+    resize_to_limit(processed_file_path)
 
     # getting image exif data
     exif = {ExifTags.TAGS[k]: v for k, v in pil_file._getexif().items() if k in ExifTags.TAGS}
-
     get_date(exif)
     get_gps(exif)
 
-    write_metadata_into_excel()
+    # writing image information into excel & csv files
+    # write_metadata_into_excel()
     write_metadata_into_csv()
 
     print('{} of {} completed.'.format((file_names.index(filename) + 1), len(file_names)))
-
     i += 1
 
 # save excel manifest --- the excel file must be closed
@@ -301,4 +351,4 @@ wb.save(excel_file_path)
 
 print(
     '\nTo upload subjects, \nEnter into the command line: \n    chdir {}\n\nFollowed by: \n    panoptes subject-set upload-subjects {} {}'.format(
-        resized_folder_path, subject_set_id, csv_file_name))
+        processed_folder_path, subject_set_id, csv_file_name))
