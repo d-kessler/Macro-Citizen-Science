@@ -18,8 +18,7 @@ from imutils import contours
 def configure():
     """Configuring image folder path"""
 
-    image_folder_path_ = input('Enter the image folder path: ')
-    # image_folder_path_ = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash - Copy"
+    # image_folder_path_ = input('Enter the image folder path: ')
     # image_folder_path_ = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash - Copy"
     # image_folder_path_ = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 12x16 no flash - Copy\cropped_Slab 1 12x16 no flash - Copy"
 
@@ -284,6 +283,11 @@ while good == 'no':
     good = input('Is this a good lower limit? [yes/no]: ')
     if good == 'yes':
         break
-    lower_limit += 1
+    if good == 'no':
+        change = input('Should the lower limit be larger of smaller? [larger/smaller]: ')
+        if change == 'larger':
+            lower_limit += 1
+        elif change == 'smaller':
+            lower_limit -= 1
 
-print('The lower limit is {} millimeters.'.format(lower_limit))
+print('\nThe lower limit is {} millimeters.'.format(lower_limit))
