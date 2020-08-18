@@ -28,7 +28,7 @@ def configure():
     should_crop_into_four = input('Should the images be cropped into 4 parts? Enter \'yes\' or \'no\':  ')
 
     # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
-    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 12x16 no flash - Copy"
+    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 6x8 no flash"
     excel_file_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Experiment_Manifest.xlsx"
     warehouse_name = 'United Stone International'
     location = 'Solon, Ohio'
