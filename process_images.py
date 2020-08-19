@@ -3,7 +3,6 @@ import os
 import io
 import json
 import csv
-import image_slicer
 import openpyxl
 from PIL import Image, ImageDraw, ExifTags
 from pathlib import Path
@@ -11,39 +10,35 @@ from datetime import datetime
 from panoptes_client import Panoptes, Classification, Collection, Project, ProjectPreferences, ProjectRole, SubjectSet, \
     Subject, User, Workflow
 import matplotlib.pyplot as plt
+from git import Repo
 
 from grain_size_density import *
 from config import *
 from image_tools import *
 from sim_melt_patches import *
+from confirm_negative import *
 
 
-def configure_files():
+def make_folders():
     """Get image folder path, input for whether to crop images"""
-    # TODO: uncomment
-
-    # image_folder_path = input('Enter the folder path: ')
-    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
-    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 6x8 no flash"
-
-    should_crop_into_four = input('Should the images be cropped into 4 parts? [yes/no]: ')
+    should_crop_into_four = input('Should the images be cropped into 4 parts? [y/n]: ')
 
     processed_folder_path = os.path.join(image_folder_path, r"processed")
     try:
         os.mkdir(processed_folder_path)
-    except:
-        print('Processed Folder Exists.')
+    except FileExistsError:
+        clear_folder(processed_folder_path)
 
-    if should_crop_into_four == 'yes':
+    if should_crop_into_four == 'y':
         cropped_folder_path = os.path.join(image_folder_path, r"cropped")
         try:
             os.mkdir(cropped_folder_path)
-        except:
-            print('Cropped Folder Exists.')
-    elif should_crop_into_four == 'no':
+        except FileExistsError:
+            clear_folder(cropped_folder_path)
+    elif should_crop_into_four == 'n':
         cropped_folder_path = ''
 
-    return image_folder_path, processed_folder_path, should_crop_into_four, cropped_folder_path
+    return processed_folder_path, should_crop_into_four, cropped_folder_path
 
 
 def configure_metadata():
@@ -117,6 +112,8 @@ def crop_into_four():
     file_names = get_file_names(cropped_folder_path)
 
     image_folder_path = cropped_folder_path
+
+    print('\nImages cropped.\n')
 
 
 def get_date(exif_dict):
@@ -235,124 +232,124 @@ def write_metadata_into_csv():
         csv_writer.writerow(row)
 
 
-def draw_scale_bar(pil_file_, image_exif_):
-    """Draw a series of scale bars on the images of size equal to lower limit (for users' reference)"""
+def update_manifests():
+    """Commit, push updated manifests to GitHub"""
+    repo_dir = '.'
+    repo = Repo(repo_dir)
+    files_to_push = [r"manifests/Experiment_Manifest.xlsx", r"manifests/Simulation_Manifest.xlsx",
+                     r"manifests/Negative_Manifest.xlsx"]
+    commit_message = 'update manifests'
+    repo.index.add(files_to_push)
+    repo.index.commit(commit_message)
+    origin = repo.remote('origin')
+    origin.push()
 
-    im = pil_file_
-    pix_width, pix_height = im.size
-
-    mm_per_pixel = get_mm_per_pixel(im)
-
-    scale_bar_pix_length = lower_limit / mm_per_pixel
-    center_of_region = (pix_height/10) / 2
-
-    draw = ImageDraw.Draw(im)
-    color = (100, 255, 0)  # (R, G, B)
-    start_coords = [center_of_region, center_of_region-(.5*scale_bar_pix_length)]
-    end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
-    scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]  # [(start x, start y), (end x, end y)]
-
-    for j in range(1, 11):
-
-        draw.line(scale_bar_pix_coords, fill=color, width=15)
-
-        start_coords[1] += (2 * center_of_region)
-
-        if j % 2 != 0:
-            start_coords[0] = pix_width - start_coords[0]
-        else:
-            start_coords[0] = center_of_region
-
-        end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
-
-        scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]
-
-    im.save(processed_file_path, exif=image_exif_)
+    print('\nManifests pushed.')
 
 
 def pause():
     input('Pause ')
 
 
-# Configure
+upload_now = input('Are you looking to upload these subjects now? [y/n]: ')
+if upload_now == 'y':
+    experiment_set_id, need_new_exp = configure_subject_set('experiment')
+    simulation_set_id, need_new_sim = configure_subject_set('simulation')
+    negative_set_id, need_new_neg = configure_subject_set('negative')
+else:
+    experiment_set_id = None
+    simulation_set_id = None
+    negative_set_id = None
 
-# TODO: uncomment
+parent_folder = "images"
+subfolders = [f.name for f in os.scandir(parent_folder) if f.is_dir()]
 
-upload_now = input('Are you looking to upload these subjects now? [yes/no]: ')
-if upload_now == 'yes':
-    subject_set_id = 86450
-    default_set = input('Would you like to use the default subject set ({})? [yes/no]: '.format(subject_set_id))
-    if default_set == 'no':
-        configure_subject_set('experiment')
+for subfolder in subfolders:
+    print('\nEntering into {}: folder {} of {}.'.format(subfolder, subfolders.index(subfolder)+1, len(subfolders)))
+    image_folder_path = os.path.join(parent_folder, subfolder)
 
-image_folder_path, processed_folder_path, should_crop_into_four, cropped_folder_path = configure_files()
+    # Make requisite folders
+    processed_folder_path, should_crop_into_four, cropped_folder_path = make_folders()
 
-# Configure excel
-excel_file_path = r"manifests/Experiment_Manifest.xlsx"
-wb, ws, first_empty_row = configure_excel(excel_file_path)
+    # Configure excel
+    excel_file_path = r"manifests/Experiment_Manifest.xlsx"
+    wb, ws, first_empty_row = configure_excel(excel_file_path)
 
-warehouse_name, location, granite_type, slab_id = configure_metadata()
-csv_file_name, csv_file_path, metadata_fields = configure_csv()
+    warehouse_name, location, granite_type, slab_id = configure_metadata()
+    csv_file_name, csv_file_path, metadata_fields = configure_csv()
 
-file_names = get_file_names(image_folder_path)
+    file_names = get_file_names(image_folder_path)
 
-# Cropping images, saving to new folder (if specified)
-if should_crop_into_four == 'yes':
-    crop_into_four()
+    # Cropping images, saving to new folder (if specified)
+    if should_crop_into_four == 'y':
+        crop_into_four()
 
-# Get grain size/density and ellipse lower limit from images in cropped folder path
-mean_grain_size, mean_grain_density, lower_limit = get_grain_size_grain_density_and_ellipse_lower_limit(
-        image_folder_path, file_names)
+    # Get grain size/density and ellipse lower limit from images in cropped folder path
+    mean_grain_size, mean_grain_density, lower_limit = get_grain_size_grain_density_and_ellipse_lower_limit(
+            image_folder_path, file_names)
 
-# Resizing images, getting and filling metadata into excel file & csv
-i = first_empty_row
+    # Resizing images, getting and filling metadata into excel file & csv
+    i = first_empty_row
 
-for filename in file_names:
-    # Assigning a subject ID equal to 'e' (for experiment) plus the total number of such subjects as of this one's addition
-    subject_id = 'e' + str(i - 1)
+    for filename in file_names:
+        # Assigning a subject ID equal to 'e' (for experiment) plus the total number of such subjects as of this one's addition
+        subject_id = 'e' + str(i - 1)
 
-    image_file_path = os.path.join(image_folder_path, filename)
-    processed_file_name = r"proc_" + filename
-    processed_file_path = os.path.join(processed_folder_path, processed_file_name)
+        image_file_path = os.path.join(image_folder_path, filename)
+        processed_file_name = r"proc_" + filename
+        processed_file_path = os.path.join(processed_folder_path, processed_file_name)
 
-    # creating PIL instance
-    pil_file = Image.open(image_file_path)
-    image_exif = pil_file.info['exif']
+        # creating PIL instance
+        pil_file = Image.open(image_file_path)
+        image_exif = pil_file.info['exif']
 
-    # drawing scale bar on image
-    draw_scale_bar(pil_file, image_exif)
+        # drawing scale bar on image
+        draw_scale_bar(processed_file_path, pil_file, image_exif, lower_limit)
 
-    # resizing, saving to new folder
-    resize_to_limit(processed_file_path)
+        # resizing, saving to new folder
+        resize_to_limit(processed_file_path)
 
-    # getting image exif data
-    exif = {ExifTags.TAGS[k]: v for k, v in pil_file._getexif().items() if k in ExifTags.TAGS}
-    get_date(exif)
-    get_gps(exif)
+        # getting image exif data
+        exif = {ExifTags.TAGS[k]: v for k, v in pil_file._getexif().items() if k in ExifTags.TAGS}
+        get_date(exif)
+        get_gps(exif)
 
-    # writing image information into excel & csv files
+        # writing image information into excel & csv files
+        write_metadata_into_excel()
+        write_metadata_into_csv()
 
-    # TODO: uncomment
+        print('{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)))
+        i += 1
 
-    # write_metadata_into_excel()
-    write_metadata_into_csv()
+    # save excel manifest --- the excel file must be closed
+    wb.save(excel_file_path)
 
-    print('{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)))
-    i += 1
+    # Executing terminal commands to upload images
+    if upload_now == 'y':
+        cmd = 'panoptes subject-set upload-subjects {} {}'.format(experiment_set_id, csv_file_path)
+        os.system(cmd)
+        print('\nExperiment subjects uploaded.')
 
-# save excel manifest --- the excel file must be closed
-wb.save(excel_file_path)
+    make_sims = input('\nPress enter to begin creating simulations...')
 
-if upload_now == 'yes':
-    print(
-        '\nTo upload subjects, \nEnter into the command line: \n    chdir {}\n\nFollowed by: \n    panoptes subject-set upload-subjects {} {}'.format(
-            processed_folder_path, subject_set_id, csv_file_name))
+    # Number of sims/negs created per folder; 5 for beta, 3 otherwise
+    max_sample = 5
 
-make_sims = input('\nPress enter to begin making simulations...')
+    # Running sim_melt_patches.py (script to make simulation images)
+    sim_file_paths = create_sims_from_process_images(processed_folder_path, upload_now, lower_limit, max_sample, simulation_set_id_=simulation_set_id)
 
-# Running sim_melt_patches.py (script to make simulation images)
-run_from_process_images(image_folder_path, lower_limit)
+    make_negs = input('\nPress enter to begin creating confirmed negatives...')
 
-# auto commit excel files to github
-# run designator code if new subject set created
-# how to deal with google drive downloads --- iterate through folders? csv and filepaths?
+    # Running confirm_negative.py (script to make confirmed negative images)
+    create_negs_from_process_images(processed_folder_path, upload_now, max_sample, negative_set_id_=negative_set_id)
+
+# Configure designator for new subject set
+if upload_now == 'y':
+    if need_new_sim == 'y' or need_new_neg == 'y':
+        config_designator(simulation_set_id, negative_set_id)
+
+# Update manifests on GitHub
+input('\nPress enter to push manifests...')
+update_manifests()
+
+# full test run

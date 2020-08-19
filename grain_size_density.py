@@ -57,7 +57,7 @@ def draw_ellipse(minor_axis_length, mm_per_pixel_, file_path_):
 
     minVal = int(min(img.flatten()))
 
-    center_coordinates = (random.randint(10, width), random.randint(10, height))
+    center_coordinates = (random.randint(15, width), random.randint(15, height))
     angle = random.randint(0, 360)
     startAngle = 0
     endAngle = 360
@@ -76,11 +76,14 @@ def draw_ellipse(minor_axis_length, mm_per_pixel_, file_path_):
     img = cv2.circle(img, center_coordinates, int(4 * axesLength[1]), (0, 255, 0), 10)
 
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    plt.show()
+    plt.show(block=False)
+    plt.waitforbuttonpress(0)
+    plt.close()
 
 
 def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, file_names_):
-    """Separate grains from backgrounds, perform edge and contour detection, """
+    """Separate grains from backgrounds, perform edge and contour detection, get mean grain size and grain density;
+    from these, calculate simulated melt patch minor axis lower limit length"""
 
     image_folder_path = image_folder_path_
     file_names = file_names_
@@ -233,24 +236,24 @@ def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, fil
     print('\nThe mean grain density is {}.\n'
           'The mean grain size is {} mm.'.format(mean_grain_density, mean_grain_size))
 
-    lower_limit = math.ceil(((1 - mean_grain_density) ** (1 / 2)) * 3)
+    lower_limit = math.ceil(((1 - mean_grain_density) ** (1 / 2)) * 2)
 
-    good = 'no'
-    while good == 'no':
+    good = 'n'
+    while good == 'n':
         random_file = sample_from_file_names(select_file_names, 1)[0]
         random_file_path = os.path.join(image_folder_path, random_file)
 
         print('\nThis ellipse is {} millimeters.'.format(lower_limit))
         draw_ellipse(lower_limit, mm_per_pixel, random_file_path)
-        good = input('    Is this a good lower limit? [yes/no]: ')
+        good = input('    Is this a good lower limit? [y/n]: ')
 
-        if good == 'yes':
+        if good == 'y':
             break
-        if good == 'no':
-            change = input('    Should the lower limit be larger of smaller? [larger/smaller]: ')
-            if change == 'larger':
+        if good == 'n':
+            change = input('    Should the lower limit be larger of smaller? [l/s]: ')
+            if change == 'l':
                 lower_limit += 1
-            elif change == 'smaller':
+            elif change == 's':
                 lower_limit -= 1
 
     print('\nThe lower limit is {} millimeters.\n'.format(lower_limit))

@@ -11,7 +11,6 @@ import imutils
 from imutils import perspective
 from imutils import contours
 import io
-import image_slicer
 from PIL import Image, ImageDraw, ExifTags
 
 
@@ -52,3 +51,38 @@ def resize_to_limit(image_file_path_, size_limit=600000):
             new_height = new_width / aspect
 
             img = img.resize((int(new_width), int(new_height)))
+
+
+def draw_scale_bar(save_file_path, pil_file_, image_exif_, lower_limit_):
+    """Draw a series of scale bars on the images of size equal to lower limit (for users' reference)"""
+
+    im = pil_file_
+    pix_width, pix_height = im.size
+
+    mm_per_pixel = get_mm_per_pixel(im)
+
+    scale_bar_pix_length = lower_limit_ / mm_per_pixel
+    center_of_region = (pix_height/10) / 2
+
+    draw = ImageDraw.Draw(im)
+    color = (100, 255, 0)  # (R, G, B)
+    start_coords = [center_of_region, center_of_region-(.5*scale_bar_pix_length)]
+    end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
+    scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]  # [(start x, start y), (end x, end y)]
+
+    for j in range(1, 11):
+
+        draw.line(scale_bar_pix_coords, fill=color, width=15)
+
+        start_coords[1] += (2 * center_of_region)
+
+        if j % 2 != 0:
+            start_coords[0] = pix_width - start_coords[0]
+        else:
+            start_coords[0] = center_of_region
+
+        end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
+
+        scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]
+
+    im.save(save_file_path, exif=image_exif_)

@@ -5,7 +5,6 @@ import random
 import numpy as np
 from matplotlib import pyplot as plt
 from skimage.color import rgb2lab, deltaE_cie76
-import image_slicer
 
 import sys
 import os
@@ -20,10 +19,9 @@ from image_tools import *
 
 def configure_file_paths():
     """Get image folder path, create folder for simulations"""
-    # TODO: uncomment
 
-    # image_folder_path = input('Enter the folder path: ')
-    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
+    image_folder_path = input('Enter the folder path: ')
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash"
     # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 6x8 no flash"
 
     return image_folder_path
@@ -34,13 +32,14 @@ def make_sim_folder(image_folder_path_):
     sim_folder_path = os.path.join(image_folder_path_, r"simulations")
     try:
         os.mkdir(sim_folder_path)
-    except:
-        print('Simulations Folder Exists.')
+    except FileExistsError:
+        clear_folder(sim_folder_path)
 
     return sim_folder_path
 
 
 def configure_metadata():
+
     feedback_id = 'meltpatch'
     training_subject = 'true'
 
@@ -94,25 +93,31 @@ def write_metadata_into_csv(csv_file_path_, metadata_fields_, subject_id, sim_fi
         csv_writer.writerow(row)
 
 
-upload_now = None
-
-
-def run_from_process_images(folder_path, lower_limit_):
+def create_sims_from_process_images(folder_path, upload_now_, lower_limit_, max_sample_, simulation_set_id_=None):
 
     image_folder_path = folder_path
     lower_limit = lower_limit_
+    upload_now = upload_now_
+    simulation_set_id = simulation_set_id_
+    max_sample = max_sample_
 
-    draw_sims(image_folder_path, lower_limit)
+    sim_file_paths = draw_sims(image_folder_path, lower_limit, max_sample, upload_now, simulation_set_id_=simulation_set_id)
+
+    # Ensuring that scale bars weren't drawn over
+    for sim_file_path in sim_file_paths:
+
+        image = Image.open(sim_file_path)
+        image_exif = image.getexif()
+
+        draw_scale_bar(sim_file_path, image, image_exif, lower_limit)
+
+    return sim_file_paths
 
 
-def draw_sims(image_folder_path, lower_limit_):
+def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulation_set_id_=None):
 
     # Create a folder for simulated images within the folder where images are fetched
     sim_folder_path = make_sim_folder(image_folder_path)  # (specified folder with images)
-
-    # If uploading, specify which subject set to upload into
-    if upload_now == 'yes':
-        subject_set_id = configure_subject_set('training')  # (subject type)
 
     # Configure excel file to be written into, find the first empty row
     excel_file_path = r"manifests/Simulation_Manifest.xlsx"
@@ -128,7 +133,6 @@ def draw_sims(image_folder_path, lower_limit_):
     file_names = get_file_names(image_folder_path)
 
     # Sample from the file names list at most 'max_sample' # of files, store in new list
-    max_sample = 20
     if len(file_names) >= max_sample:
         sample_number = max_sample
     else:
@@ -136,6 +140,7 @@ def draw_sims(image_folder_path, lower_limit_):
     select_file_names = sample_from_file_names(file_names, sample_number)  # (list to sample from, number to sample)
 
     # Index variable used to assign subject ID, decide value of axesLength
+    sim_file_paths = []
     i = first_empty_row
 
     # Iterating through sampled files
@@ -148,6 +153,8 @@ def draw_sims(image_folder_path, lower_limit_):
         sim_file_name = r"sim_" + filename
         sim_file_path = os.path.join(sim_folder_path, sim_file_name)
 
+        sim_file_paths.append(sim_file_path)
+
         # Creating an cv2 image instance named 'image'
         image = cv2.imread(image_file_path)
 
@@ -159,8 +166,8 @@ def draw_sims(image_folder_path, lower_limit_):
         minVal = cv2.minMaxLoc(gray_image)[0]
 
         # Setting ellipse center coordinates and angle w.r.t. positive x-axis
-        center_x = random.randint(10, width)
-        center_y = random.randint(10, height)
+        center_x = random.randint(15, width)
+        center_y = random.randint(15, height)
         center_coordinates = (center_x, center_y)
         angle = random.randint(0, 360)
         startAngle = 0
@@ -172,31 +179,50 @@ def draw_sims(image_folder_path, lower_limit_):
         # Setting the ratio of the length of the major to minor axis to either 2/5, 3/5, or 4/5
         minor_to_major_ratio = random.randint(2, 4) / 5
 
+        # if lower_limit_ == 3:
+        #     # if the lower limit is 3mm, draw ellipses with semi-minor axes of 3 or 5mm
+        #     minor_axes = [3 / mm_per_pixel, 5 / mm_per_pixel]
+        # elif lower_limit_ < 3:
+        #     # if the lower limit is less than 3 mm, draw ellipses with semi-minor axes of the lower limit length, 3 or 5mm
+        #     minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel, 5 / mm_per_pixel]
+        # elif 3 < lower_limit_ < 5:
+        #     # if the lower limit is between 3 and 5mm, draw ellipses with semi-minor axes of the lower limit length or 5mm
+        #     minor_axes = [lower_limit_ / mm_per_pixel, 5 / mm_per_pixel]
+        # elif lower_limit_ > 5:
+        #     # if the lower limit is greater than 5mm, draw ellipses with semi-minor axes of the lower limit length
+        #     minor_axes = [lower_limit_ / mm_per_pixel]
+
         if lower_limit_ == 3:
-        # if the lower limit is 3mm, draw ellipses with semi-minor axes of 3 or 5mm
-            minor_axes = [3 / mm_per_pixel, 5 / mm_per_pixel]
+            # if the lower limit is 3mm, draw ellipses with semi-minor axes of 3 or 5mm
+            minor_axes = [3 / mm_per_pixel]
         elif lower_limit_ < 3:
-        # if the lower limit is less than 3 mm, draw ellipses with semi-minor axes of the lower limit length, 3 or 5mm
-            minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel, 5 / mm_per_pixel]
-        elif 3 < lower_limit_ < 5:
-        # if the lower limit is between 3 and 5mm, draw ellipses with semi-minor axes of the lower limit length or 5mm
-            minor_axes = [lower_limit_ / mm_per_pixel, 5 / mm_per_pixel]
-        elif lower_limit_ > 5:
-        # if the lower limit is greater than 5mm, draw ellipses with semi-minor axes of the lower limit length
+            # if the lower limit is less than 3 mm, draw ellipses with semi-minor axes of the lower limit length, 3 or 5mm
+            minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel]
+        elif lower_limit_ > 3:
+            # if the lower limit is between 3 and 5mm, draw ellipses with semi-minor axes of the lower limit length or 5mm
             minor_axes = [lower_limit_ / mm_per_pixel]
 
         # Creating a list of semi-major axes equal to that of semi-minor ones times the (randomized) ratio between them
         major_axes = [axis / minor_to_major_ratio for axis in minor_axes]
 
-        # Create a (near) equal numbers of ellipses of each possible axes lengths; slightly more of lower limit
-        if len(minor_axes) == 3:
-            if i % 2 == 0 and i % 3 != 0:
-                axesLength = [int(major_axes[0]), int(minor_axes[0])]
-            elif i % 3 == 0:
-                axesLength = [int(major_axes[1]), int(minor_axes[1])]
-            else:
-                axesLength = [int(major_axes[2]), int(minor_axes[2])]
-        elif len(minor_axes) == 2:
+        # # Create a (near) equal numbers of ellipses of each possible axes lengths; slightly biasing those of lower limit
+        # if len(minor_axes) == 3:
+        #     if i % 2 == 0 and i % 3 != 0:
+        #         axesLength = [int(major_axes[0]), int(minor_axes[0])]
+        #     elif i % 3 == 0:
+        #         axesLength = [int(major_axes[1]), int(minor_axes[1])]
+        #     else:
+        #         axesLength = [int(major_axes[2]), int(minor_axes[2])]
+        # elif len(minor_axes) == 2:
+        #     if i % 2 == 0:
+        #         axesLength = [int(major_axes[0]), int(minor_axes[0])]
+        #     else:
+        #         axesLength = [int(major_axes[1]), int(minor_axes[1])]
+        # elif len(minor_axes) == 1:
+        #     axesLength = [int(major_axes[0]), int(minor_axes[0])]
+
+        # Create an equal numbers of ellipses of each possible axes lengths
+        if len(minor_axes) == 2:
             if i % 2 == 0:
                 axesLength = [int(major_axes[0]), int(minor_axes[0])]
             else:
@@ -204,7 +230,7 @@ def draw_sims(image_folder_path, lower_limit_):
         elif len(minor_axes) == 1:
             axesLength = [int(major_axes[0]), int(minor_axes[0])]
 
-        # Geting axes radii (the input for cv2 ellipse function)
+        # Getting axes radii (the input for cv2 ellipse function)
         axesRadii = tuple([int(j / 2) for j in axesLength])
 
         # Setting the color of the drawn ellipse equal to the dark color in the image
@@ -228,22 +254,22 @@ def draw_sims(image_folder_path, lower_limit_):
         # Resizing the image to be under the Zooniverse recommended 600KB limit
         resize_to_limit(sim_file_path)
 
-        # TODO: uncomment
-
-        # Write various metadata data-points into both the specified excel file and created csv
-        # write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+        # Write metadata values into both the specified excel file and created csv
+        write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
                                   axesLength, angle, minor_to_major_ratio)
         write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
                                 axesLength, angle, minor_to_major_ratio)
 
-        print('{} of {} completed.'.format((select_file_names.index(filename) + 1), len(select_file_names)))
+        print('{} of {} simulations made.'.format((select_file_names.index(filename) + 1), len(select_file_names)))
         i += 1
 
     # Saving the excel manifest --- it must be closed
     wb.save(excel_file_path)
 
-    # Printing terminal commands required to upload images
-    if upload_now == 'yes':
-        print(
-            '\nTo upload subjects, \nEnter into the command line: \n    chdir {}\n\nFollowed by: \n    panoptes subject-set upload-subjects {} {}'.format(
-                sim_folder_path, subject_set_id, csv_file_name))
+    # Executing terminal commands to upload images
+    if upload_now_ == 'y':
+        cmd = 'panoptes subject-set upload-subjects {} {}'.format(simulation_set_id_, csv_file_path)
+        os.system(cmd)
+        print('\nSimulation subjects uploaded.')
+
+    return sim_file_paths

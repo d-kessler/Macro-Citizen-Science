@@ -1,8 +1,10 @@
 import openpyxl
 import random
 import os
+import stat
 from panoptes_client import Panoptes, Classification, Collection, Project, ProjectPreferences, ProjectRole, SubjectSet, \
     Subject, User, Workflow
+import shutil
 
 
 def configure_subject_set(subject_type):
@@ -16,23 +18,21 @@ def configure_subject_set(subject_type):
     workflow = Workflow.find(workflow_id)
     workflow.save()
 
-    print('The existing subject sets are:')
+    set_ids = []
+    print('\nThe existing subject sets are:')
     for ss in macro_project.links.subject_sets:
         set_name = ss.display_name
+        set_id = int(str(ss).split()[1].replace('>', ''))
+        set_ids.append(set_id)
         print(ss, set_name)
 
-    experiment_subjects = SubjectSet.find(86450)
-    print(int(str(experiment_subjects).split()[1].replace('>', '')))
-    pause()
-    experiment_subjects_id = [int(s) for s in str(experiment_subjects).split() if s.isdigit()]
-    print(experiment_subjects_id)
-    pause()
-
-    need_new_set = input('Would you like to create a new {} subject set? [yes/no]: '.format(subject_type))
-    if need_new_set == 'no':
-        subject_set_id = input('Enter the ID of the existing set you\'d like to upload to: ')
-    elif need_new_set == 'yes':
-        subject_set_name = input('Enter a name for the new subject set: ')
+    need_new_set = input('\nWould you like to create a new {} subject set? [y/n]: '.format(subject_type.upper()))
+    if need_new_set == 'n':
+        subject_set_id = input('    Enter the ID of the existing set you\'d like to upload to: ')
+        while (int(subject_set_id) in set_ids) is False:
+            subject_set_id = input('    This ID does not exist; please enter a new one: ')
+    elif need_new_set == 'y':
+        subject_set_name = input('    Enter a name for the new subject set: ')
 
         subject_set = SubjectSet()
         subject_set.links.project = macro_project
@@ -43,11 +43,10 @@ def configure_subject_set(subject_type):
 
         subject_set_id = int(str(subject_set).split()[1].replace('>', ''))
 
-    return subject_set_id
+    return subject_set_id, need_new_set
 
 
 def configure_excel(excel_file_path_):
-    # TODO: uncomment
 
     wb = openpyxl.load_workbook(filename=excel_file_path_)
     ws = wb['Sheet1']
@@ -77,3 +76,38 @@ def sample_from_file_names(file_names_, number):
     select_file_names_ = random.sample(file_names_, number)
 
     return select_file_names_
+
+
+def clear_folder(folder_path):
+    try:
+        shutil.rmtree(folder_path)
+        os.mkdir(folder_path)
+    except:
+        input('Failed to remove folder, "{}"; do this manually, then press enter to continue...'.format(folder_path))
+
+
+def config_designator(simulation_subjects_id, negative_subjects_id):
+    Panoptes.connect(username='macrodarkmatter@gmail.com', password='2pP3pbKkUze2')
+
+    project_id = 11726
+    macro_project = Project.find(project_id)
+    macro_project.save()
+
+    workflow_id = 14437
+    workflow = Workflow.find(workflow_id)
+    workflow.save()
+
+    workflow.configuration['training_set_ids'] = [simulation_subjects_id, negative_subjects_id]
+    workflow.configuration['training_chances'] = [[0.40] * 50, [0.20] * 50]
+    workflow.configuration['training_default_chances'] = [0.1]
+    workflow.configuration[
+        'subject_queue_page_size'] = 10  # determines how many subjects are loaded in queue at one time
+
+    # Training subjects are not retired, experiment subjects are retired via SWAP/Caesar
+    workflow.retirement['criteria'] = 'never_retire'
+
+    # Saving
+    workflow.modified_attributes.add('configuration')
+    workflow.save()
+
+    print('\nDesignator configured.')
