@@ -132,6 +132,9 @@ def create_negs(image_folder_path, upload_now_, max_sample, negative_set_id_=Non
             classification = 'positive'
             pos_file_name = r"pos_" + filename
             pos_file_path = os.path.join(pos_folder_path, pos_file_name)
+            image.save(pos_file_path)
+            print('\nThe image has been saved to the "positives folder."')
+            continue
 
         # Write metadata values into both the specified excel file and created csv
         write_metadata_into_excel(ws, i, subject_id, neg_file_name, training_subject, feedback_id, classification)
