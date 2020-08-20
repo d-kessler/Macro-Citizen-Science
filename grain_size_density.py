@@ -126,7 +126,7 @@ def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, fil
         dil_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         dil_edges_img = cv2.dilate(edges_img, dil_kernel)
 
-        # UNCOMMENT TO SAVE INTERMEDIATE STEP IMAGES TO 'edits' FOLDER
+        # # UNCOMMENT TO SAVE INTERMEDIATE STEP IMAGES TO 'edits' FOLDER
         # edits_folder_path = os.path.join(image_folder_path, 'edits')
         # try:
         #     os.mkdir(edits_folder_path)

@@ -42,15 +42,15 @@ def make_folders():
 
 
 def configure_metadata():
-    # warehouse_name = input('Warehouse name: ')
-    # location = input('Location (City, State): ')
-    # granite_type = input('Granite type: ')
-    # slab_id = input('Slab ID: ')
+    warehouse_name = input('Warehouse name: ')
+    location = input('Location (City, State): ')
+    granite_type = input('Granite type: ')
+    slab_id = input('Slab ID: ')
 
-    warehouse_name = 'United Stone International'
-    location = 'Solon, Ohio'
-    granite_type = 'Dallas White'
-    slab_id = '1151|20'
+    # warehouse_name = 'United Stone International'
+    # location = 'Solon, Ohio'
+    # granite_type = 'Dallas White'
+    # slab_id = '1151|20'
 
     return warehouse_name, location, granite_type, slab_id
 
@@ -304,7 +304,7 @@ for subfolder in subfolders:
         image_exif = pil_file.info['exif']
 
         # drawing scale bar on image
-        draw_scale_bar(processed_file_path, pil_file, image_exif, lower_limit)
+        draw_scale_bars(processed_file_path, pil_file, image_exif, lower_limit)
 
         # resizing, saving to new folder
         resize_to_limit(processed_file_path)

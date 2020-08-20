@@ -109,7 +109,7 @@ def create_sims_from_process_images(folder_path, upload_now_, lower_limit_, max_
         image = Image.open(sim_file_path)
         image_exif = image.getexif()
 
-        draw_scale_bar(sim_file_path, image, image_exif, lower_limit)
+        draw_scale_bars(sim_file_path, image, image_exif, lower_limit)
 
     return sim_file_paths
 

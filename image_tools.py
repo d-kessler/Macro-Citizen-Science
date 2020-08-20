@@ -53,7 +53,7 @@ def resize_to_limit(image_file_path_, size_limit=600000):
             img = img.resize((int(new_width), int(new_height)))
 
 
-def draw_scale_bar(save_file_path, pil_file_, image_exif_, lower_limit_):
+def draw_scale_bars(save_file_path, pil_file_, image_exif_, lower_limit_):
     """Draw a series of scale bars on the images of size equal to lower limit (for users' reference)"""
 
     im = pil_file_
