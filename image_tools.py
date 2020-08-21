@@ -62,27 +62,53 @@ def draw_scale_bars(save_file_path, pil_file_, image_exif_, lower_limit_):
     mm_per_pixel = get_mm_per_pixel(im)
 
     scale_bar_pix_length = lower_limit_ / mm_per_pixel
-    center_of_region = (pix_height/10) / 2
+
+    if lower_limit_ >= 3:
+        number_of_bars = 10
+    elif lower_limit_ == 2:
+        number_of_bars = 10
+    elif lower_limit_ == 1:
+        number_of_bars = 20
+
+    side_center_of_region = (pix_height / number_of_bars) / 2
+    top_center_of_region = (pix_width / number_of_bars) / 2
 
     draw = ImageDraw.Draw(im)
     color = (100, 255, 0)  # (R, G, B)
-    start_coords = [center_of_region, center_of_region-(.5*scale_bar_pix_length)]
-    end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
-    scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]  # [(start x, start y), (end x, end y)]
+    side_start_coords = [15, side_center_of_region-(.5*scale_bar_pix_length)]
+    side_end_coords = [side_start_coords[0], side_start_coords[1] + scale_bar_pix_length]
 
-    for j in range(1, 11):
+    top_start_coords = [top_center_of_region-(.5*scale_bar_pix_length), 15]
+    top_end_coords = [top_start_coords[0] + scale_bar_pix_length, top_start_coords[1]]
 
-        draw.line(scale_bar_pix_coords, fill=color, width=15)
+    side_bar_pix_coords = [tuple(side_start_coords), tuple(side_end_coords)]  # [(start x, start y), (end x, end y)]
+    top_bar_pix_coords = [tuple(top_start_coords), tuple(top_end_coords)]
 
-        start_coords[1] += (2 * center_of_region)
+    for j in range(1, number_of_bars+1):
+
+        draw.line(side_bar_pix_coords, fill=color, width=10)
+        draw.line(top_bar_pix_coords, fill=color, width=10)
+
+        side_start_coords[1] += (2 * side_center_of_region)
+        top_start_coords[0] += (2 * top_center_of_region)
 
         if j % 2 != 0:
-            start_coords[0] = pix_width - start_coords[0]
+            side_start_coords[0] = pix_width - side_start_coords[0]
+            top_start_coords[1] = pix_height - top_start_coords[1]
         else:
-            start_coords[0] = center_of_region
+            side_start_coords[0] = 15
+            top_start_coords[1] = 15
 
-        end_coords = [start_coords[0], start_coords[1] + scale_bar_pix_length]
+        side_end_coords = [side_start_coords[0], side_start_coords[1] + scale_bar_pix_length]
+        top_end_coords = [top_start_coords[0] + scale_bar_pix_length, top_start_coords[1]]
 
-        scale_bar_pix_coords = [tuple(start_coords), tuple(end_coords)]
+        side_bar_pix_coords = [tuple(side_start_coords), tuple(side_end_coords)]
+        top_bar_pix_coords = [tuple(top_start_coords), tuple(top_end_coords)]
 
-    im.save(save_file_path, exif=image_exif_)
+        # plt.imshow(im)
+        # plt.show(block=False)
+        # plt.waitforbuttonpress(0)
+        # plt.close()
+
+    # im.save(save_file_path, exif=image_exif_)
+    im.save(save_file_path)

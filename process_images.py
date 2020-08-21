@@ -6,7 +6,7 @@ import csv
 import openpyxl
 from PIL import Image, ImageDraw, ExifTags
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from panoptes_client import Panoptes, Classification, Collection, Project, ProjectPreferences, ProjectRole, SubjectSet, \
     Subject, User, Workflow
 import matplotlib.pyplot as plt
@@ -46,13 +46,14 @@ def configure_metadata():
     location = input('Location (City, State): ')
     granite_type = input('Granite type: ')
     slab_id = input('Slab ID: ')
+    number_of_columns = input('Number of columns: ')
 
     # warehouse_name = 'United Stone International'
     # location = 'Solon, Ohio'
     # granite_type = 'Dallas White'
     # slab_id = '1151|20'
 
-    return warehouse_name, location, granite_type, slab_id
+    return warehouse_name, location, granite_type, slab_id, number_of_columns
 
 
 def configure_csv():
@@ -61,7 +62,7 @@ def configure_csv():
 
     with open(csv_file_path, 'w', newline='') as f:
         metadata_fields = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
-                           '#date_time', '#latitude_longitude', '#mean_grain_size', '#mean_grain_density', '#lower_limit']
+                           '#date_time', '#latitude_longitude', '#mean_grain_size', '#mean_grain_density', '#number_of_columns']
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
         csv_writer.writeheader()
 
@@ -204,7 +205,7 @@ def write_metadata_into_excel():
         ws.cell(row=i, column=8).value = '-'
     ws.cell(row=i, column=9).value = mean_grain_size
     ws.cell(row=i, column=10).value = mean_grain_density
-    ws.cell(row=i, column=11).value = lower_limit
+    ws.cell(row=i, column=11).value = number_of_columns
 
 
 def write_metadata_into_csv():
@@ -227,7 +228,7 @@ def write_metadata_into_csv():
             row['#latitude_longitude'] = '-'
         row['#mean_grain_size'] = mean_grain_size
         row['#mean_grain_density'] = mean_grain_density
-        row['#lower_limit'] = lower_limit
+        row['#number_of_columns'] = number_of_columns
 
         csv_writer.writerow(row)
 
@@ -238,7 +239,7 @@ def update_manifests():
     repo = Repo(repo_dir)
     files_to_push = [r"manifests/Experiment_Manifest.xlsx", r"manifests/Simulation_Manifest.xlsx",
                      r"manifests/Negative_Manifest.xlsx"]
-    commit_message = 'update manifests'
+    commit_message = 'update manifests, {}'.format(date.today())
     repo.index.add(files_to_push)
     repo.index.commit(commit_message)
     origin = repo.remote('origin')
@@ -275,7 +276,7 @@ for subfolder in subfolders:
     excel_file_path = r"manifests/Experiment_Manifest.xlsx"
     wb, ws, first_empty_row = configure_excel(excel_file_path)
 
-    warehouse_name, location, granite_type, slab_id = configure_metadata()
+    warehouse_name, location, granite_type, slab_id, number_of_columns = configure_metadata()
     csv_file_name, csv_file_path, metadata_fields = configure_csv()
 
     file_names = get_file_names(image_folder_path)
@@ -284,8 +285,9 @@ for subfolder in subfolders:
     if should_crop_into_four == 'y':
         crop_into_four()
 
-    # Get grain size/density and ellipse lower limit from images in cropped folder path
-    mean_grain_size, mean_grain_density, lower_limit = get_grain_size_grain_density_and_ellipse_lower_limit(
+    # Get grain size/density from images in subdirectory or cropped folder path
+    lower_limit = 2
+    mean_grain_size, mean_grain_density = get_grain_size_grain_density_and_ellipse_lower_limit(
             image_folder_path, file_names)
 
     # Resizing images, getting and filling metadata into excel file & csv
@@ -315,7 +317,7 @@ for subfolder in subfolders:
         get_gps(exif)
 
         # writing image information into excel & csv files
-        write_metadata_into_excel()
+        # write_metadata_into_excel()
         write_metadata_into_csv()
 
         print('{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)))
@@ -352,4 +354,6 @@ if upload_now == 'y':
 input('\nPress enter to push manifests...')
 update_manifests()
 
-# full test run
+print('\nProcessing completed. Go to project builder if you\'d like to update the active subject sets.')
+
+# set active subject sets

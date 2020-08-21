@@ -137,7 +137,7 @@ def create_negs(image_folder_path, upload_now_, max_sample, negative_set_id_=Non
             continue
 
         # Write metadata values into both the specified excel file and created csv
-        write_metadata_into_excel(ws, i, subject_id, neg_file_name, training_subject, feedback_id, classification)
+        # write_metadata_into_excel(ws, i, subject_id, neg_file_name, training_subject, feedback_id, classification)
         write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, neg_file_name, training_subject,
                                 feedback_id, classification)
 

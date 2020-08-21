@@ -236,26 +236,26 @@ def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, fil
     print('\nThe mean grain density is {}.\n'
           'The mean grain size is {} mm.'.format(mean_grain_density, mean_grain_size))
 
-    lower_limit = math.ceil(((1 - mean_grain_density) ** (1 / 2)) * 2)
+    # lower_limit = math.ceil(((1 - mean_grain_density) ** (1 / 2)) * 2)
+    #
+    # good = 'n'
+    # while good == 'n':
+    #     random_file = sample_from_file_names(select_file_names, 1)[0]
+    #     random_file_path = os.path.join(image_folder_path, random_file)
+    #
+    #     print('\nThis ellipse is {} millimeters.'.format(lower_limit))
+    #     draw_ellipse(lower_limit, mm_per_pixel, random_file_path)
+    #     good = input('    Is this a good lower limit? [y/n]: ')
+    #
+    #     if good == 'y':
+    #         break
+    #     if good == 'n':
+    #         change = input('    Should the lower limit be larger of smaller? [l/s]: ')
+    #         if change == 'l':
+    #             lower_limit += 1
+    #         elif change == 's':
+    #             lower_limit -= 1
+    #
+    # print('\nThe lower limit is {} millimeters.\n'.format(lower_limit))
 
-    good = 'n'
-    while good == 'n':
-        random_file = sample_from_file_names(select_file_names, 1)[0]
-        random_file_path = os.path.join(image_folder_path, random_file)
-
-        print('\nThis ellipse is {} millimeters.'.format(lower_limit))
-        draw_ellipse(lower_limit, mm_per_pixel, random_file_path)
-        good = input('    Is this a good lower limit? [y/n]: ')
-
-        if good == 'y':
-            break
-        if good == 'n':
-            change = input('    Should the lower limit be larger of smaller? [l/s]: ')
-            if change == 'l':
-                lower_limit += 1
-            elif change == 's':
-                lower_limit -= 1
-
-    print('\nThe lower limit is {} millimeters.\n'.format(lower_limit))
-
-    return mean_grain_size, mean_grain_density, lower_limit
+    return mean_grain_size, mean_grain_density

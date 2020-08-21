@@ -177,58 +177,19 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
         mm_per_pixel = get_mm_per_pixel(image)  # (image variable)
 
         # Setting the ratio of the length of the major to minor axis to either 2/5, 3/5, or 4/5
-        minor_to_major_ratio = random.randint(2, 4) / 5
+        ratios = [2/5]*30 + [3/5]*30 + [4/5]*30 + [1]*10
+        minor_to_major_ratio = random.choice(ratios)
 
-        # if lower_limit_ == 3:
-        #     # if the lower limit is 3mm, draw ellipses with semi-minor axes of 3 or 5mm
-        #     minor_axes = [3 / mm_per_pixel, 5 / mm_per_pixel]
-        # elif lower_limit_ < 3:
-        #     # if the lower limit is less than 3 mm, draw ellipses with semi-minor axes of the lower limit length, 3 or 5mm
-        #     minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel, 5 / mm_per_pixel]
-        # elif 3 < lower_limit_ < 5:
-        #     # if the lower limit is between 3 and 5mm, draw ellipses with semi-minor axes of the lower limit length or 5mm
-        #     minor_axes = [lower_limit_ / mm_per_pixel, 5 / mm_per_pixel]
-        # elif lower_limit_ > 5:
-        #     # if the lower limit is greater than 5mm, draw ellipses with semi-minor axes of the lower limit length
-        #     minor_axes = [lower_limit_ / mm_per_pixel]
-
-        if lower_limit_ == 3:
-            # if the lower limit is 3mm, draw ellipses with semi-minor axes of 3 or 5mm
-            minor_axes = [3 / mm_per_pixel]
-        elif lower_limit_ < 3:
-            # if the lower limit is less than 3 mm, draw ellipses with semi-minor axes of the lower limit length, 3 or 5mm
-            minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel]
-        elif lower_limit_ > 3:
-            # if the lower limit is between 3 and 5mm, draw ellipses with semi-minor axes of the lower limit length or 5mm
-            minor_axes = [lower_limit_ / mm_per_pixel]
+        minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel]
 
         # Creating a list of semi-major axes equal to that of semi-minor ones times the (randomized) ratio between them
         major_axes = [axis / minor_to_major_ratio for axis in minor_axes]
 
-        # # Create a (near) equal numbers of ellipses of each possible axes lengths; slightly biasing those of lower limit
-        # if len(minor_axes) == 3:
-        #     if i % 2 == 0 and i % 3 != 0:
-        #         axesLength = [int(major_axes[0]), int(minor_axes[0])]
-        #     elif i % 3 == 0:
-        #         axesLength = [int(major_axes[1]), int(minor_axes[1])]
-        #     else:
-        #         axesLength = [int(major_axes[2]), int(minor_axes[2])]
-        # elif len(minor_axes) == 2:
-        #     if i % 2 == 0:
-        #         axesLength = [int(major_axes[0]), int(minor_axes[0])]
-        #     else:
-        #         axesLength = [int(major_axes[1]), int(minor_axes[1])]
-        # elif len(minor_axes) == 1:
-        #     axesLength = [int(major_axes[0]), int(minor_axes[0])]
-
-        # Create an equal numbers of ellipses of each possible axes lengths
-        if len(minor_axes) == 2:
-            if i % 2 == 0:
-                axesLength = [int(major_axes[0]), int(minor_axes[0])]
-            else:
-                axesLength = [int(major_axes[1]), int(minor_axes[1])]
-        elif len(minor_axes) == 1:
+        # Creating an equal numbers of ellipses of 3mm and 5mm semi-minor axes lengths
+        if i % 2 == 0:
             axesLength = [int(major_axes[0]), int(minor_axes[0])]
+        else:
+            axesLength = [int(major_axes[1]), int(minor_axes[1])]
 
         # Getting axes radii (the input for cv2 ellipse function)
         axesRadii = tuple([int(j / 2) for j in axesLength])
@@ -241,9 +202,9 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
                             startAngle, endAngle, color, -1)
 
         # # Draw a circle around the drawn ellipse in green (for checking purposes)
-        # image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
+        image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
 
-        # # ???
+        # # ?
         # noise = np.random.normal(1000., 1000., (1000, 1000, 3))
         # noise_file_path = os.path.join(sim_folder_path, 'gaussian_noise.png')
         # granite = cv2.imwrite(noise_file_path, noise)
@@ -251,12 +212,16 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
         # Saving simulated image to its created filed path
         cv2.imwrite(sim_file_path, image)
 
+        image = Image.open(sim_file_path)
+        image_exif = image.getexif()
+        draw_scale_bars(sim_file_path, image, image_exif, lower_limit_)
+
         # Resizing the image to be under the Zooniverse recommended 600KB limit
         resize_to_limit(sim_file_path)
 
         # Write metadata values into both the specified excel file and created csv
-        write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
-                                  axesLength, angle, minor_to_major_ratio)
+        # write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+        #                           axesLength, angle, minor_to_major_ratio)
         write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
                                 axesLength, angle, minor_to_major_ratio)
 
@@ -273,3 +238,15 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
         print('\nSimulation subjects uploaded.')
 
     return sim_file_paths
+
+
+def run():
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 12x16 no flash - Copy\cropped_Slab 1 12x16 no flash - Copy"
+    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash - Copy"
+    lower_limit = 3
+    max_sample = 7
+    upload_now = 'n'
+
+    draw_sims(image_folder_path, lower_limit, max_sample, upload_now)
+
+# run()
