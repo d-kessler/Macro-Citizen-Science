@@ -1,5 +1,6 @@
 # importing cv2 
 import cv2
+import cv
 import argparse
 import random
 import numpy as np
@@ -150,7 +151,7 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
         # Getting the file's full path, creating a path for the simulated image to be created from it
         image_file_path = os.path.join(image_folder_path, filename)
-        sim_file_name = r"sim_" + filename
+        sim_file_name = subject_id + r"_" + filename
         sim_file_path = os.path.join(sim_folder_path, sim_file_name)
 
         sim_file_paths.append(sim_file_path)
@@ -199,7 +200,7 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
         # Draw (filled-in) ellipse with specified parameters
         image = cv2.ellipse(image, center_coordinates, axesRadii, angle,
-                            startAngle, endAngle, color, -1)
+                            startAngle, endAngle, color, thickness=-1, lineType=cv2.LINE_AA)
 
         # # Draw a circle around the drawn ellipse in green (for checking purposes)
         image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)

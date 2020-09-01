@@ -46,7 +46,7 @@ def configure_metadata():
     location = input('Location (City, State): ')
     granite_type = input('Granite type: ')
     slab_id = input('Slab ID: ')
-    number_of_columns = input('Number of columns: ')
+    number_of_columns = input('Number of Columns: ')
 
     # warehouse_name = 'United Stone International'
     # location = 'Solon, Ohio'
@@ -62,7 +62,8 @@ def configure_csv():
 
     with open(csv_file_path, 'w', newline='') as f:
         metadata_fields = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
-                           '#date_time', '#latitude_longitude', '#mean_grain_size', '#mean_grain_density', '#number_of_columns']
+                           '#date_time', '#latitude_longitude', '#mean_grain_size', '#mean_grain_density',
+                           '#number_of_columns']
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields)
         csv_writer.writeheader()
 
@@ -98,17 +99,21 @@ def crop_into_four():
 
             if j == 1:
                 im = im.crop(section_1)
+                location = 'TL'
             if j == 2:
                 im = im.crop(section_2)
+                location = 'TR'
             if j == 3:
                 im = im.crop(section_3)
+                location = 'BR'
             if j == 4:
                 im = im.crop(section_4)
+                location = 'BL'
 
             reformatted_cropped_file_path = cropped_file_path.replace(str(extension),
-                                                                      "_{}{}".format(str(j), str(extension)))
+                                                                      "_{}{}".format(location, str(extension)))
 
-            im = im.save(reformatted_cropped_file_path, exif=image_exif_)
+            im.save(reformatted_cropped_file_path, exif=image_exif_)
 
     file_names = get_file_names(cropped_folder_path)
 
@@ -266,7 +271,7 @@ parent_folder = "images"
 subfolders = [f.name for f in os.scandir(parent_folder) if f.is_dir()]
 
 for subfolder in subfolders:
-    print('\nEntering into {}: folder {} of {}.'.format(subfolder, subfolders.index(subfolder)+1, len(subfolders)))
+    print('\nEntering into {}: folder {} of {}.'.format(subfolder, subfolders.index(subfolder) + 1, len(subfolders)))
     image_folder_path = os.path.join(parent_folder, subfolder)
 
     # Make requisite folders
@@ -288,17 +293,54 @@ for subfolder in subfolders:
     # Get grain size/density from images in subdirectory or cropped folder path
     lower_limit = 2
     mean_grain_size, mean_grain_density = get_grain_size_grain_density_and_ellipse_lower_limit(
-            image_folder_path, file_names)
+        image_folder_path, file_names)
 
     # Resizing images, getting and filling metadata into excel file & csv
     i = first_empty_row
+
+    # Initializing images' row and column location on the slab
+    row = 1
+    col = 0
+    crop_count = 0
 
     for filename in file_names:
         # Assigning a subject ID equal to 'e' (for experiment) plus the total number of such subjects as of this one's addition
         subject_id = 'e' + str(i - 1)
 
+        # Getting row number
+        row_changed = 0
+        if should_crop_into_four == 'y':
+            if (file_names.index(filename)/4) % int(number_of_columns) == 0 and file_names.index(filename) != 0:
+                row += 1
+                row_changed = 1
+        elif should_crop_into_four == 'n':
+            if file_names.index(filename) % int(number_of_columns) == 0 and file_names.index(filename) != 0:
+                row += 1
+                row_changed = 1
+
+        # Getting column number
+        if row % 2 == 0:
+            if should_crop_into_four == 'y':
+                if crop_count % 4 == 0 and row_changed != 1:
+                    col -= 1
+            elif should_crop_into_four == 'n' and row_changed != 1:
+                col -= 1
+        elif row % 2 != 0:
+            if should_crop_into_four == 'y' and row_changed != 1:
+                if crop_count % 4 == 0:
+                    col += 1
+            elif should_crop_into_four == 'n' and row_changed != 1:
+                col += 1
+
         image_file_path = os.path.join(image_folder_path, filename)
-        processed_file_name = r"proc_" + filename
+        extension = os.path.splitext(filename)[-1]
+        if should_crop_into_four == 'y':
+            crop_file_name = os.path.splitext(filename)[-2]
+            crop_location = crop_file_name.split("_")[-1]
+            processed_file_name = subject_id + r"_" + str(slab_id) + r"_" + str(row) + r"_" + str(col) + r"_" + \
+                                  crop_location + str(extension)
+        elif should_crop_into_four == 'n':
+            processed_file_name = subject_id + r"_" + str(slab_id) + r"_" + str(row) + r"_" + str(col) + str(extension)
         processed_file_path = os.path.join(processed_folder_path, processed_file_name)
 
         # creating PIL instance
@@ -317,11 +359,12 @@ for subfolder in subfolders:
         get_gps(exif)
 
         # writing image information into excel & csv files
-        # write_metadata_into_excel()
+        write_metadata_into_excel()
         write_metadata_into_csv()
 
         print('{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)))
         i += 1
+        crop_count += 1
 
     # save excel manifest --- the excel file must be closed
     wb.save(excel_file_path)
@@ -338,7 +381,8 @@ for subfolder in subfolders:
     max_sample = 5
 
     # Running sim_melt_patches.py (script to make simulation images)
-    sim_file_paths = create_sims_from_process_images(processed_folder_path, upload_now, lower_limit, max_sample, simulation_set_id_=simulation_set_id)
+    sim_file_paths = create_sims_from_process_images(processed_folder_path, upload_now, lower_limit, max_sample,
+                                                     simulation_set_id_=simulation_set_id)
 
     make_negs = input('\nPress enter to begin creating confirmed negatives...')
 

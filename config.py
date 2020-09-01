@@ -82,10 +82,9 @@ def clear_folder(folder_path):
     try:
         shutil.rmtree(folder_path)
         os.mkdir(folder_path)
-    except PermissionError:
-        input('Permissions error for {}, '
-              '\ntry exiting out of the folder you are in or closing the files window,\n'
-              'and press enter to continue... '.format(folder_path))
+    except PermissionError or FileNotFoundError:
+        input('\nPermissions error for {}, '
+              '\nExit the file window and restart the program.'.format(folder_path))
 
 
 def config_designator(simulation_subjects_id, negative_subjects_id):

@@ -110,7 +110,7 @@ def create_negs(image_folder_path, upload_now_, max_sample, negative_set_id_=Non
 
         # Getting the file's full path, creating a path for the simulated image to be created from it
         image_file_path = os.path.join(image_folder_path, filename)
-        neg_file_name = r"neg_" + filename
+        neg_file_name = subject_id + r"_" + filename
         neg_file_path = os.path.join(neg_folder_path, neg_file_name)
 
         # Creating an cv2 image instance named 'image'
@@ -137,7 +137,7 @@ def create_negs(image_folder_path, upload_now_, max_sample, negative_set_id_=Non
             continue
 
         # Write metadata values into both the specified excel file and created csv
-        # write_metadata_into_excel(ws, i, subject_id, neg_file_name, training_subject, feedback_id, classification)
+        write_metadata_into_excel(ws, i, subject_id, neg_file_name, training_subject, feedback_id, classification)
         write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, neg_file_name, training_subject,
                                 feedback_id, classification)
 

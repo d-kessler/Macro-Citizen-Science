@@ -234,7 +234,7 @@ def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, fil
     mean_grain_size = statistics.mean(mean_grain_sizes)
 
     print('\nThe mean grain density is {}.\n'
-          'The mean grain size is {} mm.'.format(mean_grain_density, mean_grain_size))
+          'The mean grain size is {} mm.\n'.format(mean_grain_density, mean_grain_size))
 
     # lower_limit = math.ceil(((1 - mean_grain_density) ** (1 / 2)) * 2)
     #
