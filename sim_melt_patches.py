@@ -203,7 +203,7 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
                             startAngle, endAngle, color, thickness=-1, lineType=cv2.LINE_AA)
 
         # # Draw a circle around the drawn ellipse in green (for checking purposes)
-        image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
+        # image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
 
         # # ?
         # noise = np.random.normal(1000., 1000., (1000, 1000, 3))
@@ -221,8 +221,8 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
         resize_to_limit(sim_file_path)
 
         # Write metadata values into both the specified excel file and created csv
-        # write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
-        #                           axesLength, angle, minor_to_major_ratio)
+        write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+                                  axesLength, angle, minor_to_major_ratio)
         write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
                                 axesLength, angle, minor_to_major_ratio)
 

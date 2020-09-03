@@ -33,6 +33,7 @@ def resize_to_limit(image_file_path_, size_limit=600000):
     """Resize images to size_limit"""
 
     img = Image.open(image_file_path_)
+    image_exif = img.info['exif']
     aspect = img.size[0] / img.size[1]
 
     while True:
@@ -44,7 +45,7 @@ def resize_to_limit(image_file_path_, size_limit=600000):
         # print("size: {}; factor: {:.3f}".format(filesize, size_deviation))
 
         if size_deviation <= 1:
-            img.save(image_file_path_)
+            img.save(image_file_path_, exif=image_exif)
             break
         else:
             new_width = img.size[0] / (1 * (size_deviation ** 0.5))
@@ -111,4 +112,4 @@ def draw_scale_bars(save_file_path, pil_file_, image_exif_, lower_limit_):
         # plt.close()
 
     # im.save(save_file_path, exif=image_exif_)
-    im.save(save_file_path)
+    im.save(save_file_path, exif=image_exif_)
