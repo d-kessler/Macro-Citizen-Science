@@ -196,7 +196,8 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
         # Setting the color of the drawn ellipse equal to the darkest color in the image
         #color = (minVal, minVal, minVal)
-        color = np.random.normal(center_x,minVal,(10,10))
+        #color = np.random.normal(center_x,minVal,(10,10))
+
 
         # Draw (filled-in) ellipse with specified parameters
         image = cv2.ellipse(image, center_coordinates, axesRadii, angle,
