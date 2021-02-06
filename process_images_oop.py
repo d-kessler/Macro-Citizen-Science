@@ -30,9 +30,10 @@ class ProcessImages:
 
     # Conversion to millimeters
     mm_per_inch = 25.4
-    image_dimensions_mm = [x * mm_per_inch for x in image_dimensions]
+    image_dimensions_mm = [x * 25.4 for x in image_dimensions]
 
     # Number of training images (simulations and negatives each) made per folder
+    # TODO: CHANGE TO BETA-SAMPLE NUMBER
     training_images_per_folder = 5
 
     # TODO: TEMPORARY
@@ -72,9 +73,10 @@ class ProcessImages:
             print('Please enter \'y\' or \'no\'... ')
             self.upload_now = input('Are you looking to upload these subjects now? [y/n]: ')
         if self.upload_now == 'y':
-            self.experiment_set_id, self.need_new_exp = self.configure_subject_set('experiment')
-            self.simulation_set_id, self.need_new_sim = self.configure_subject_set('simulation')
-            self.negative_set_id, self.need_new_neg = self.configure_subject_set('negative')
+            self.subject_set_ids = self.get_existing_subject_sets()
+            self.experiment_set_id, self.need_new_exp = self.configure_subject_set('experiment', self.subject_set_ids)
+            self.simulation_set_id, self.need_new_sim = self.configure_subject_set('simulation', self.subject_set_ids)
+            self.negative_set_id, self.need_new_neg = self.configure_subject_set('negative', self.subject_set_ids)
 
             # Configuring designator for new subject sets (if any are made)
             if self.need_new_sim == 'y' or self.need_new_neg == 'y':
@@ -115,7 +117,7 @@ class ProcessImages:
             self.sim_wb, self.sim_ws, self.sim_first_empty_row = self.configure_excel(self.sim_manifest_path)
             self.neg_wb, self.neg_ws, self.neg_first_empty_row = self.configure_excel(self.neg_manifest_path)
 
-            # Configuring experimental images' metadata
+            # Configuring experiment images' metadata
             self.warehouse_name, self.location, self.granite_type, self.slab_id, self.number_of_columns = self.configure_exp_metadata()
 
             # Configuring .CSV files (used for syncing images with metadata in Zooniverse databases)
@@ -144,7 +146,7 @@ class ProcessImages:
                 # Getting the image's file path
                 self.image_file_path = os.path.join(self.current_folder_path, image_file_name)
 
-                # Assigning an experimental subject ID
+                # Assigning an experiment subject ID
                 self.exp_subject_id = 'e' + str(self.exp_i - 1)
 
                 # Getting the image's position on the slab and naming its file accordingly
@@ -201,6 +203,8 @@ class ProcessImages:
             # Saving experiment manifest
             self.exp_wb.save(self.exp_manifest_path)
 
+            # TODO: PROGRAM STALLS HERE; extra (attempted simulation?) images are saved to main Slab 3 folder
+
             # Creating simulation images
             self.image_file_names_sample_sims = random.sample(self.image_file_names, self.training_images_per_folder)
             for image_file_name in self.image_file_names_sample_sims:
@@ -212,13 +216,13 @@ class ProcessImages:
 
                 # Renaming, moving the image to the simulation folder, creating a Pillow image instance, and getting exif info
                 self.sim_image_file_name = self.sim_subject_id + r"_" + image_file_name
-                self.sim_image_file_path = os.path.join(self.current_folder_path, self.sim_image_file_name)
+                self.sim_image_file_path = os.path.join(self.sim_folder_path, self.sim_image_file_name)
                 self.sim_image_file_path = shutil.copyfile(self.image_file_path, self.sim_image_file_path)
                 self.sim_pil_img, self.image_exif = self.configure_pil_img(self.sim_image_file_path)
 
                 # Drawing the simulation
-                self.sim_pil_img, self.ellipse_axes_lengths, self.ellipse_center_coordinates, self.ellipse_angle \
-                    = self.draw_sim(self.sim_pil_img)
+                self.sim_pil_img, self.ellipse_axes_lengths, self.ellipse_center_coordinates, self.ellipse_angle, \
+                    self.major_to_minor_axes_ratio = self.draw_sim(self.sim_pil_img)
 
                 # TODO: TEMPORARY
                 # If scale bars were drawn, redrawing them to ensure than they were not covered by a simulation
@@ -232,7 +236,7 @@ class ProcessImages:
                 self.sim_metadata_list = [self.sim_subject_id, self.sim_image_file_name, self.sim_feedback_id,
                                           self.ellipse_center_coordinates[0], self.ellipse_center_coordinates[1],
                                           self.ellipse_axes_lengths[0], self.ellipse_axes_lengths[1],
-                                          self.ellipse_angle]
+                                          self.ellipse_angle, self.major_to_minor_axes_ratio]
                 self.write_metadata_into_manifest(self.sim_ws, self.sim_i, self.sim_metadata_list)
                 self.write_metadata_into_CSV(self.sim_csv_file_path, self.sim_metadata_fields, self.sim_metadata_list)
 
@@ -258,7 +262,7 @@ class ProcessImages:
 
                 # Renaming, moving the image to the simulation folder, creating a Pillow image instance, and getting exif info
                 self.neg_image_file_name = self.neg_subject_id + r"_" + image_file_name
-                self.neg_image_file_path = os.path.join(self.current_folder_path, self.neg_image_file_name)
+                self.neg_image_file_path = os.path.join(self.neg_folder_path, self.neg_image_file_name)
                 self.neg_image_file_path = shutil.copyfile(self.image_file_path, self.neg_image_file_path)
                 self.neg_pil_img, self.image_exif = self.configure_pil_img(self.neg_image_file_path)
 
@@ -277,24 +281,26 @@ class ProcessImages:
                 self.write_metadata_into_manifest(self.neg_ws, self.neg_i, self.neg_metadata_list)
                 self.write_metadata_into_CSV(self.neg_csv_file_path, self.neg_metadata_fields, self.neg_metadata_list)
 
-                # Printing status
-                print('\r{} of {} simulations made.'.format(
-                    (self.image_file_names_sample_negs.index(image_file_name) + 1),
-                    len(self.image_file_names_sample_negs)), end="")
+                # # Printing status
+                # print('\r{} of {} negatives examined.'.format(
+                #     (self.image_file_names_sample_negs.index(image_file_name) + 1),
+                #     len(self.image_file_names_sample_negs)), end="")
 
                 # Updating indexing variable
                 self.neg_i += 1
 
-            # Saving simulation manifest
-            self.neg_wb.save(self.sim_manifest_path)
+            # Saving negative manifest
+            self.neg_wb.save(self.neg_manifest_path)
 
-            # If specified, uploading images and updating manifests on Github
+            # Pushing updated manifests to Github
+            self.push_manifests()
+
+            # If specified, uploading images
             if self.upload_now == 'y':
                 self.upload_images()
-                self.push_manifests()
 
     def push_manifests(self):
-        # Pushing the current (local) manifests to Github
+        # Pushing the updated local manifests to Github
         repo_directory = '.'  # ie. current directory
         repo = Repo(repo_directory)
         files_to_push = [r"manifests/Experiment_Manifest.xlsx", r"manifests/Simulation_Manifest.xlsx",
@@ -320,7 +326,7 @@ class ProcessImages:
 
     def create_negative(self, image_file_name, pil_img):
         # Printing status
-        print('Displaying image {} of {}'.format(self.image_file_names_sample_negs.index(image_file_name) + 1,
+        print('\nDisplaying image {} of {}'.format(self.image_file_names_sample_negs.index(image_file_name) + 1,
                                                  len(self.image_file_names_sample_negs)))
         # Displaying the sampled image
         plt.imshow(pil_img)
@@ -349,7 +355,7 @@ class ProcessImages:
     def create_blank_pil_img(model_pil_img):
         # Creating a blank (white) image of equal dimensions to model_pil_img, saving to blank_img_path
         blank_img_path = r"sim_tools\blank.png"
-        blank_img_np = 255 * np.ones(model_pil_img.shape, np.uint8)
+        blank_img_np = 255 * np.ones(np.array(model_pil_img).shape, np.uint8)
         cv2.imwrite(blank_img_path, blank_img_np)
         # Creating a PIL instance for the blank image
         blank_pil_img = Image.open(blank_img_path)
@@ -373,17 +379,17 @@ class ProcessImages:
         # TODO: select according to distribution
         minor_axis_mm = 3
         # TODO: select according to distribution
-        major_to_minor_axis_ratio = 2
-        major_axis_mm = minor_axis_mm * major_to_minor_axis_ratio
+        major_to_minor_axes_ratio = 2
+        major_axis_mm = minor_axis_mm * major_to_minor_axes_ratio
         ellipse_axes_lengths = (major_axis_mm, minor_axis_mm)
         # Initializing (random) ellipse position, excluding 1mm region around the image's edges
         ellipse_center_x_coord = random.randint(int(1 / self.mm_per_pixel),
-                                                int((self.image_dimensions[1] - 1) / self.mm_per_pixel))
+                                                int((self.image_dimensions_mm[1] - 1) / self.mm_per_pixel))
         ellipse_center_y_coord = random.randint(int(1 / self.mm_per_pixel),
-                                                int((self.image_dimensions[0] - 1) / self.mm_per_pixel))
+                                                int((self.image_dimensions_mm[0] - 1) / self.mm_per_pixel))
         ellipse_center_coordinates = (ellipse_center_x_coord, ellipse_center_y_coord)
         # Initializing (random) ellipse angle (in degrees) above the horizontal
-        ellipse_angle = random.randint(0, 360)
+        ellipse_angle = random.randint(0, 180)
         # Converting axes lengths from millimeters to pixels, accounting for the template image's blank-space borders
         major_axis_pix = major_axis_mm / self.mm_per_pixel
         minor_axis_pix = minor_axis_mm / self.mm_per_pixel
@@ -394,18 +400,43 @@ class ProcessImages:
         adjusted_ellipse_axes_lengths = (adjusted_major_axis_pix, adjusted_minor_axis_pix)
         # Resizing the ellipse
         ellipse_pil_img = ellipse_pil_img.resize(adjusted_ellipse_axes_lengths)  # major, minor
+        # Correcting for the errors introduced by blank-space borders / rotation on the ellipse center coordinates
+        L, l = ellipse_pil_img.size
+        beta = np.arccos(1 / np.sqrt((l ** 2 / L ** 2) + 1))
+        d = np.sqrt((1 / 4) * l ** 2 + (1 / 4) * L ** 2)
+        if 0 < ellipse_angle <= 90:
+            alpha = np.radians(ellipse_angle) - beta
+            x1 = d * np.cos(alpha)
+            y1 = d * np.sin(alpha)
+            b = L * np.sin(np.radians(ellipse_angle))
+            x0 = abs(x1)
+            y0 = abs(b - y1)
+            topLeft_to_center_x = int(ellipse_center_x_coord - x0)
+            topLeft_to_center_y = int(ellipse_center_y_coord - y0)
+        elif 90 < ellipse_angle <= 180:
+            alpha = np.radians(ellipse_angle) + beta
+            x1 = d * np.cos(alpha)
+            y1 = d * np.sin(alpha)
+            u = l * np.sin(np.radians(ellipse_angle - 90))
+            x0 = abs(x1)
+            y0 = abs(u + y1)
+            topLeft_to_center_x = int(ellipse_center_x_coord - x0)
+            topLeft_to_center_y = int(ellipse_center_y_coord - y0)
+        elif ellipse_angle == 0:
+            topLeft_to_center_x = int(ellipse_center_x_coord - (adjusted_major_axis_pix / 2))
+            topLeft_to_center_y = int(ellipse_center_y_coord - (adjusted_minor_axis_pix / 2))
         # Rotating the ellipse
         ellipse_pil_img = ellipse_pil_img.rotate(ellipse_angle, expand=True)
         # Ensuring that the ellipse will not be pasted over glare areas
         overlap = 0
-        while overlap is not set():
+        while overlap != set():
             # Pasting the simulation ellipse onto a blank (white) image to obtain a list of ellipse pixels
             blank_pil_img = self.create_blank_pil_img(sim_pil_img)
             overlap = self.get_glare_ellipse_overlap(ellipse_pil_img, ellipse_center_coordinates, blank_pil_img)
         # Pasting the ellipse onto pil_image
-        sim_pil_img.paste(ellipse_pil_img, ellipse_center_coordinates, ellipse_pil_img)
+        sim_pil_img.paste(ellipse_pil_img, (topLeft_to_center_x, topLeft_to_center_y), ellipse_pil_img)
 
-        return sim_pil_img, ellipse_axes_lengths, ellipse_center_coordinates, ellipse_angle
+        return sim_pil_img, ellipse_axes_lengths, ellipse_center_coordinates, ellipse_angle, major_to_minor_axes_ratio
 
     @staticmethod
     def write_metadata_into_CSV(CSV_file_path, metadata_fields, metadata_list):
@@ -419,7 +450,7 @@ class ProcessImages:
     @staticmethod
     def write_metadata_into_manifest(ws, row, metadata_list):
         for i in range(len(metadata_list)):
-            ws.cell(row=row, column=(i + 1)).value = metadata_list[i]
+            ws.cell(row=row, column=(i + 1)).value = str(metadata_list[i])
 
     @staticmethod
     def convert_to_degrees(value):
@@ -553,10 +584,10 @@ class ProcessImages:
         dil_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         dil_edges_img = cv2.dilate(edges_img, dil_kernel)
         # Getting, sorting a list of contours
-        contours_from_img = dil_edges_img
-        contours_list = cv2.findContours(contours_from_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_list = cv2.findContours(dil_edges_img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours_list = grab_contours(contours_list)
-        (contours_list, _) = contours.sort_contours(contours_list)
+        if contours_list:
+            (contours_list, _) = contours.sort_contours(contours_list)
         # Initializing lists
         wanted_contours_list = []
         contour_dims = []
@@ -605,18 +636,19 @@ class ProcessImages:
         return wanted_contours_list, contour_dims, total_contour_area
 
     def get_glare_area(self, pil_img):
+        cv2_img = np.array(pil_img)
         # Setting lower and upper color limits for thresholding
         lower = (230, 230, 230)
         upper = (255, 255, 255)
         # Getting pixels between lower and upper color limits (those corresponding to glare areas), blurring to smooth edges
-        mask = cv2.inRange(pil_img, lower, upper)
+        mask = cv2.inRange(cv2_img, lower, upper)
         mask = cv2.blur(mask, (10, 10))
         # Getting a list of the glare patches' edges/contours, dimensions and the total glare area
         glare_contours, glare_dims, total_glare_area = self.get_contours(mask, 2.5)
         # Converting the total glare area from square pixels to square millimeters
         total_glare_area_mmSq = total_glare_area * (self.mm_per_pixel ** 2)
         # Isolating glare areas on a blank (black) image to get a list of glare pixels
-        blank_img = np.zeros(pil_img.shape, np.uint8)
+        blank_img = np.zeros(cv2_img.shape, np.uint8)
         isolated_glare_img = cv2.drawContours(blank_img, glare_contours, contourIdx=-1, color=(255, 255, 255),
                                               thickness=cv2.FILLED)
         glare_rows, glare_cols, _ = np.where(isolated_glare_img != 0)
@@ -710,7 +742,7 @@ class ProcessImages:
         else:
             self.row = 0
 
-        return self.row_changed, self.row, self.col, self.crop_count
+        return row_changed, self.row, self.col, self.crop_count
 
     @staticmethod
     def configure_pil_img(image_file_path):
@@ -774,6 +806,7 @@ class ProcessImages:
         granite_type = input('Granite type: ')
         slab_id = input('Slab ID: ')
         number_of_columns = input('Number of Columns: ')
+        print('\n')
 
         # warehouse_name = 'United Stone International'
         # location = 'Solon, Ohio'
@@ -794,7 +827,7 @@ class ProcessImages:
         return desired_csv_file_path
 
     def configure_CSVs(self):
-        exp_csv_file_name = 'experimental_subjects.csv'
+        exp_csv_file_name = 'experiment_subjects.csv'
         exp_metadata_fields_list = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
                                     '#date_time', '#latitude_longitude', 'grain_density',
                                     '#grain_stats(mm)(number_of_grains, '
@@ -803,7 +836,7 @@ class ProcessImages:
         exp_csv_file_path = self.configure_CSV(self.exp_folder_path, exp_csv_file_name, exp_metadata_fields_list)
 
         sim_csv_file_name = 'simulation_subjects.csv'
-        sim_metadata_fields_list = ['!subject_id', '#file_name', '#training_subject', '#feedback_1_id', '#feedback_1_x',
+        sim_metadata_fields_list = ['!subject_id', '#file_name', '#feedback_1_id', '#feedback_1_x',
                                     '#feedback_1_y', '#feedback_1_toleranceA', '#feedback_1_toleranceB',
                                     '#feedback_1_theta',
                                     '#minor_to_major_ratio']
@@ -848,7 +881,7 @@ class ProcessImages:
         return desired_folder_path
 
     def make_folders(self):
-        experimental_folder_path = self.make_folder(self.current_folder_path, r"experimental")
+        experiment_folder_path = self.make_folder(self.current_folder_path, r"experiment")
         if self.should_crop_into_four == 'y':
             cropped_folder_path = self.make_folder(self.current_folder_path, r"cropped")
         else:
@@ -857,7 +890,7 @@ class ProcessImages:
         neg_folder_path = self.make_folder(self.current_folder_path, r"negatives")
         pos_folder_path = self.make_folder(self.current_folder_path, r"positives")
 
-        return experimental_folder_path, cropped_folder_path, sim_folder_path, neg_folder_path, pos_folder_path
+        return experiment_folder_path, cropped_folder_path, sim_folder_path, neg_folder_path, pos_folder_path
 
     def configure_designator(self):
         # Connect to project & workflow
@@ -879,11 +912,11 @@ class ProcessImages:
 
         print('\nDesignator configured.')
 
-    def configure_subject_set(self, subject_type):
-        # Connect to project & workflow
+    def get_existing_subject_sets(self):
+        # Connecting to project & workflow
         zoonv_project, zoonv_workflow = self.configure_zooniverse()
 
-        # Get a list of existing subject sets' names & IDs
+        # Getting and printing a list of existing subject sets' names & IDs
         subject_set_ids = []
         subject_set_names = []
         print('\nThe existing subject sets are:')
@@ -894,6 +927,11 @@ class ProcessImages:
             subject_set_names.append(subject_set_name)
         print(
             "\n".join("{} --- {}".format(ss_id, ss_name) for ss_id, ss_name in zip(subject_set_ids, subject_set_names)))
+        return subject_set_ids
+
+    def configure_subject_set(self, subject_type, subject_set_ids):
+        # Connecting to project & workflow
+        zoonv_project, zoonv_workflow = self.configure_zooniverse()
 
         # Selecting an existing subject set or creating a new one based on user input
         need_new_set = input(f"\nWould you like to create a new {subject_type.upper()} subject set? [y/n]: ")

@@ -8,8 +8,7 @@ import statistics
 from scipy.spatial import distance
 from skimage.util import img_as_ubyte
 import imutils
-from imutils import perspective
-from imutils import contours
+from imutils import perspective, contours
 
 from config import *
 from image_tools import *
@@ -32,20 +31,6 @@ def get_stats(list_, quant_name=''):
     #       'The 25th and 75th percentiles are [{}, {}]'
     #       .format(number, quant_name, average, median, standard_deviation,
     #               minimum, maximum, twenty_fifth, seventy_fifth))
-
-
-def midpoint(ptA, ptB):
-    return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5
-
-
-def canny_thresholds(image, sigma=0.33):
-    # compute the median of the single channel pixel intensities
-    v = np.median(image)
-    # apply automatic Canny edge detection using the computed median
-    lower = int(max(0, (1.0 - sigma) * v))
-    upper = int(min(255, (1.0 + sigma) * v))
-
-    return lower, upper
 
 
 def draw_ellipse(minor_axis_length, mm_per_pixel_, file_path_):
@@ -228,7 +213,7 @@ def get_grain_size_grain_density_and_ellipse_lower_limit(image_folder_path_, fil
 
         mean_grain_sizes.append(mean_grain_size)
 
-        print('{} of {} images\' grains analyzed.'.format((select_file_names.index(file_name) + 1), len(select_file_names)))
+        print('\r{} of {} images\' grains analyzed.'.format((select_file_names.index(file_name) + 1), len(select_file_names)), end="")
 
     mean_grain_density = statistics.mean(grain_densities)
     mean_grain_size = statistics.mean(mean_grain_sizes)

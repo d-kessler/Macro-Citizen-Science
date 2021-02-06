@@ -62,6 +62,8 @@ def draw_scale_bars(save_file_path, pil_file_, image_exif_, lower_limit_):
 
     mm_per_pixel = get_mm_per_pixel(im)
 
+    # TODO: Clean up
+
     scale_bar_pix_length = lower_limit_ / mm_per_pixel
 
     if lower_limit_ >= 3:
@@ -113,3 +115,17 @@ def draw_scale_bars(save_file_path, pil_file_, image_exif_, lower_limit_):
 
     # im.save(save_file_path, exif=image_exif_)
     im.save(save_file_path, exif=image_exif_)
+
+
+def canny_thresholds(image, sigma=0.33):
+    # compute the median of the single channel pixel intensities
+    v = np.median(image)
+    # apply automatic Canny edge detection using the computed median
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+
+    return lower, upper
+
+
+def midpoint(ptA, ptB):
+    return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5

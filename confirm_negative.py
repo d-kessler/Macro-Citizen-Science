@@ -33,10 +33,9 @@ def configure_metadata():
     return feedback_id, training_subject
 
 
-def configure_csv(sim_folder_path_):
-    """Configuring csv file, saving in simulation images folder"""
-    csv_file_name = 'simulation_subjects.csv'
-    csv_file_path = os.path.join(sim_folder_path_, csv_file_name)
+def configure_csv(neg_folder_path):
+    csv_file_name = 'negative_subjects.csv'
+    csv_file_path = os.path.join(neg_folder_path, csv_file_name)
 
     with open(csv_file_path, 'w', newline='') as f:
         metadata_fields = ['!subject_id', '#file_name', '#training_subject', '#feedback_1_id', '#classification']

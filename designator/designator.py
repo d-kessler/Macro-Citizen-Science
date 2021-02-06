@@ -26,7 +26,7 @@ negative_subjects.save()
 workflow_id = 14437
 workflow = Workflow.find(workflow_id)
 workflow.configuration['training_set_ids'] = [simulation_subjects_id, negative_subjects_id]
-workflow.configuration['training_chances'] = [[0.40] * 50, [0.20] * 50]
+workflow.configuration['training_chances'] = [[0] * 1, [0.40] * 50, [0.20] * 50]
 workflow.configuration['training_default_chances'] = [0.1]
 workflow.configuration['subject_queue_page_size'] = 10  # determines how many subjects are loaded in queue at one time
 

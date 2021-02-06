@@ -40,7 +40,6 @@ def make_sim_folder(image_folder_path_):
 
 
 def configure_metadata():
-
     feedback_id = 'meltpatch'
     training_subject = 'true'
 
@@ -62,7 +61,8 @@ def configure_csv(sim_folder_path_):
     return csv_file_name, csv_file_path, metadata_fields
 
 
-def write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates, axesLength,
+def write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+                              axesLength,
                               angle, minor_to_major_ratio):
     ws.cell(row=i, column=1).value = subject_id
     ws.cell(row=i, column=2).value = str(sim_file_name)
@@ -76,7 +76,8 @@ def write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject
     ws.cell(row=i, column=10).value = minor_to_major_ratio
 
 
-def write_metadata_into_csv(csv_file_path_, metadata_fields_, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates, axesLength,
+def write_metadata_into_csv(csv_file_path_, metadata_fields_, subject_id, sim_file_name, training_subject, feedback_id,
+                            center_coordinates, axesLength,
                             angle, minor_to_major_ratio):
     with open(csv_file_path_, 'a', newline='') as f:
         csv_writer = csv.DictWriter(f, fieldnames=metadata_fields_)
@@ -95,18 +96,17 @@ def write_metadata_into_csv(csv_file_path_, metadata_fields_, subject_id, sim_fi
 
 
 def create_sims_from_process_images(folder_path, upload_now_, lower_limit_, max_sample_, simulation_set_id_=None):
-
     image_folder_path = folder_path
     lower_limit = lower_limit_
     upload_now = upload_now_
     simulation_set_id = simulation_set_id_
     max_sample = max_sample_
 
-    sim_file_paths = draw_sims(image_folder_path, lower_limit, max_sample, upload_now, simulation_set_id_=simulation_set_id)
+    sim_file_paths = draw_sims(image_folder_path, lower_limit, max_sample, upload_now,
+                               simulation_set_id_=simulation_set_id)
 
     # Ensuring that scale bars weren't drawn over
     for sim_file_path in sim_file_paths:
-
         image = Image.open(sim_file_path)
         image_exif = image.getexif()
 
@@ -116,7 +116,6 @@ def create_sims_from_process_images(folder_path, upload_now_, lower_limit_, max_
 
 
 def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulation_set_id_=None):
-
     # Create a folder for simulated images within the folder where images are fetched
     sim_folder_path = make_sim_folder(image_folder_path)  # (specified folder with images)
 
@@ -142,10 +141,13 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
     # Index variable used to assign subject ID, decide value of axesLength
     sim_file_paths = []
-    i = first_empty_row
+    # TODO: uncomment
+    # i = first_empty_row
+    i = 1
 
     # Iterating through sampled files
     for filename in select_file_names:
+
         # Assigning a subject ID equal to 's' (for simulation) plus the total number of such subjects as of this one's addition
         subject_id = 's' + str(i - 1)
 
@@ -161,36 +163,96 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
         # Getting image height and width (in units of pixels)
         height, width, _ = image.shape
-        
+
         # Find the darkest color present in the image
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         minVal = cv2.minMaxLoc(gray_image)[0]
 
+        # Finding the number of millimeters (on the image's 6x8 inch scale) per pixel
+        mm_per_pixel = get_mm_per_pixel(image)  # (image variable)
+
         # Setting ellipse center coordinates and angle w.r.t. positive x-axis
-        center_x = random.randint(15, width)
-        center_y = random.randint(15, height)
+        center_x = random.randint(int(25/mm_per_pixel), int((width-25)/mm_per_pixel))
+        center_y = random.randint(int(25/mm_per_pixel), int((height-25)/mm_per_pixel))
         center_coordinates = (center_x, center_y)
         angle = random.randint(0, 360)
         startAngle = 0
         endAngle = 360
 
-        # Finding the number of millimeters (on the image's 6x8 inch scale) per pixel
-        mm_per_pixel = get_mm_per_pixel(image)  # (image variable)
+        # # SWAP Continuum choice of minor axes lengths
+        # minor_axes_distribution = np.concatenate(
+        #     (np.linspace(1, 1.5, 20), np.linspace(1.5, 2, 20), np.linspace(2, 3, 20),
+        #      np.linspace(3, 4, 20), np.linspace(4, 6, 20)))
+        # minor_axis_mm = random.choice(minor_axes_distribution)
+        # minor_axis = minor_axis_mm / mm_per_pixel
 
-        # Setting the ratio of the length of the major to minor axis to either 2/5, 3/5, or 4/5
-        ratios = [2/5]*30 + [3/5]*30 + [4/5]*30 + [1]*10
-        minor_to_major_ratio = random.choice(ratios)
+        # SWAP Discrete choice of axes lengths
+        #
+        # minor_axes_mm = [2, 3]  # minor axes lengths in millimeters
+        # minor_axes = [minor_axis / mm_per_pixel for minor_axis in minor_axes_mm]
+        #
+        # # Creating an equal numbers of ellipses of lower limit and 3mm semi-minor axes lengths
+        # if i % 2 == 0:
+        #     axesLength = [int(major_axes[0]), int(minor_axes[0])]
+        # else:
+        #     axesLength = [int(major_axes[1]), int(minor_axes[1])]
 
-        minor_axes = [lower_limit_ / mm_per_pixel, 3 / mm_per_pixel]
+        # # Setting major axis
+        # minor_to_major_ratio = random.uniform(1, 10)
+        # if minor_to_major_ratio > 10:
+        #     minor_to_major_ratio = 10
+        # major_axis = minor_axis * minor_to_major_ratio
+        # axesLength = [major_axis, minor_axis]
 
-        # Creating a list of semi-major axes equal to that of semi-minor ones times the (randomized) ratio between them
-        major_axes = [axis / minor_to_major_ratio for axis in minor_axes]
+        if i in range(1, 10) or i == 1 or i == 10:
+            minor_axis = 1 / mm_per_pixel
+            minor_to_major_ratio = i
 
-        # Creating an equal numbers of ellipses of 3mm and 5mm semi-minor axes lengths
-        if i % 2 == 0:
-            axesLength = [int(major_axes[0]), int(minor_axes[0])]
-        else:
-            axesLength = [int(major_axes[1]), int(minor_axes[1])]
+        if i in range(11, 20) or i == 11 or i == 20:
+            minor_axis = 1.5 / mm_per_pixel
+            minor_to_major_ratio = i - 10
+
+        if i in range(21, 30) or i == 21 or i == 30:
+            minor_axis = 2 / mm_per_pixel
+            minor_to_major_ratio = i - 20
+
+        if i in range(31, 40) or i == 31 or i == 40:
+            minor_axis = 2.5 / mm_per_pixel
+            minor_to_major_ratio = i - 30
+
+        if i in range(41, 50) or i == 41 or i == 50:
+            minor_axis = 3 / mm_per_pixel
+            minor_to_major_ratio = i - 40
+
+        if i in range(51, 60) or i == 51 or i == 60:
+            minor_axis = 3.5 / mm_per_pixel
+            minor_to_major_ratio = i - 50
+
+        if i in range(61, 65) or i == 61 or i == 65:
+            minor_axis = 4 / mm_per_pixel
+            minor_to_major_ratio = i - 60
+
+        if i in range(66, 70) or i == 66 or i == 70:
+            minor_axis = 4.5 / mm_per_pixel
+            minor_to_major_ratio = i - 65
+
+        if i in range(71, 73) or i == 71 or i == 73:
+            minor_axis = 5 / mm_per_pixel
+            minor_to_major_ratio = i - 70
+
+        if i in range(74, 77) or i == 74 or i == 77:
+            minor_axis = 5.5 / mm_per_pixel
+            minor_to_major_ratio = i - 73
+
+        if i in range(78, 80) or i == 78 or i == 80:
+            minor_axis = 6 / mm_per_pixel
+            minor_to_major_ratio = i - 77
+
+        major_axis = minor_axis * minor_to_major_ratio
+        name = '{:.1f}mm_{:.1f}mm_{:.1f}'.format(minor_axis * mm_per_pixel, int(major_axis * mm_per_pixel),
+                                                 minor_to_major_ratio)
+
+        axesLength = [major_axis, minor_axis]
 
         # Getting axes radii (the input for cv2 ellipse function)
         axesRadii = tuple([int(j / 2) for j in axesLength])
@@ -201,32 +263,41 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
         # Draw (filled-in) ellipse with specified parameters
         image = cv2.ellipse(image, center_coordinates, axesRadii, angle,
                             startAngle, endAngle, color, thickness=-1, lineType=cv2.LINE_AA)
-
-        # # Draw a circle around the drawn ellipse in green (for checking purposes)
-        # image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
-
-        # # ?
-        # noise = np.random.normal(1000., 1000., (1000, 1000, 3))
-        # noise_file_path = os.path.join(sim_folder_path, 'gaussian_noise.png')
-        # granite = cv2.imwrite(noise_file_path, noise)
+        image = cv2.circle(image, center_coordinates, 500, (0, 255, 0), 10)
+        # image = cv2.putText(image, '{:.2f}mm, {:.2f}, {:.2f}'.format(np.ceil(2 * axesRadii[1] * mm_per_pixel), int(2 * axesRadii[0] * mm_per_pixel), minor_to_major_ratio),
+        #                     (center_coordinates[0] - 120, center_coordinates[1] - 120), cv2.FONT_HERSHEY_SIMPLEX, 2,
+        #                     (0, 255, 0), thickness=4)
 
         # Saving simulated image to its created filed path
-        cv2.imwrite(sim_file_path, image)
+        # TODO: uncomment
+        # cv2.imwrite(sim_file_path, image)
+        save_name = os.path.join(sim_folder_path, name + r".jpeg")
+        cv2.imwrite(save_name, image)
 
-        image = Image.open(sim_file_path)
-        image_exif = image.getexif()
-        draw_scale_bars(sim_file_path, image, image_exif, lower_limit_)
+        # # Draw a circle around the drawn ellipse in green (for checking purposes)
+        # sim_file_path_circled = os.path.join(sim_folder_path, subject_id + r"_CircledSim.jpeg")
+        # circled_image = cv2.circle(image, center_coordinates, 4 * axesLength[0], (0, 255, 0), 10)
+        # cv2.imwrite(sim_file_path_circled, circled_image)
+
+        # TODO: uncomment, change last argument
+        # image = Image.open(sim_file_path)
+        # image_exif = image.getexif()
+        # draw_scale_bars(sim_file_path, image, image_exif, 2)
 
         # Resizing the image to be under the Zooniverse recommended 600KB limit
-        resize_to_limit(sim_file_path)
+        # TODO: uncomment
+        # resize_to_limit(sim_file_path)
 
         # Write metadata values into both the specified excel file and created csv
-        write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
-                                  axesLength, angle, minor_to_major_ratio)
-        write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+        # write_metadata_into_excel(ws, i, subject_id, sim_file_name, training_subject, feedback_id, center_coordinates,
+        #                           axesLength, angle, minor_to_major_ratio)
+        write_metadata_into_csv(csv_file_path, metadata_fields, subject_id, sim_file_name, training_subject,
+                                feedback_id, center_coordinates,
                                 axesLength, angle, minor_to_major_ratio)
 
-        print('{} of {} simulations made.'.format((select_file_names.index(filename) + 1), len(select_file_names)))
+        # TODO: uncomment
+        print('\r{} of {} simulations made.'.format((select_file_names.index(filename) + 1), len(select_file_names)),
+              end="")
         i += 1
 
     # Saving the excel manifest --- it must be closed
@@ -242,12 +313,16 @@ def draw_sims(image_folder_path, lower_limit_, max_sample, upload_now_, simulati
 
 
 def run():
-    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 1 12x16 no flash - Copy\cropped_Slab 1 12x16 no flash - Copy"
-    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Data, Analysis\Slab 3 6x8 no flash - Copy"
-    lower_limit = 3
-    max_sample = 7
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Python\Macro-Citizen-Science\images\beta-sample"
+    image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Python\Macro-Citizen-Science\images\beta-sample-2"
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Python\Macro-Citizen-Science\images\Slab 1 6x8 no flash - Copy"
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Python\Macro-Citizen-Science\images\1Slab_1_12x16_no_flash\cropped"
+    # image_folder_path = r"C:\Users\dkess\OneDrive\Documents\CWRU\Macro\Python\Macro-Citizen-Science\images\slab 3"
+    lower_limit = []
+    max_sample = 100
     upload_now = 'n'
 
     draw_sims(image_folder_path, lower_limit, max_sample, upload_now)
 
-# run()
+
+run()

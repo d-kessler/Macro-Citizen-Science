@@ -18,6 +18,10 @@ from image_tools import *
 from sim_melt_patches import *
 from confirm_negative import *
 
+# ------------- #
+lower_limit = 2
+# ------------- #
+
 
 def make_folders():
     """Get image folder path, input for whether to crop images"""
@@ -120,6 +124,10 @@ def crop_into_four():
     image_folder_path = cropped_folder_path
 
     print('\nImages cropped.\n')
+
+
+def threshold_glare():
+    pass
 
 
 def get_date(exif_dict):
@@ -257,6 +265,7 @@ def pause():
     input('Pause ')
 
 
+# Configure subject set(s) to upload to
 upload_now = input('Are you looking to upload these subjects now? [y/n]: ')
 if upload_now == 'y':
     experiment_set_id, need_new_exp = configure_subject_set('experiment')
@@ -267,9 +276,11 @@ else:
     simulation_set_id = None
     negative_set_id = None
 
+# Get a list of subfolders in parent "images" folder
 parent_folder = "images"
 subfolders = [f.name for f in os.scandir(parent_folder) if f.is_dir()]
 
+# Iterates through list of subfolders
 for subfolder in subfolders:
     print('\nEntering into {}: folder {} of {}.'.format(subfolder, subfolders.index(subfolder) + 1, len(subfolders)))
     image_folder_path = os.path.join(parent_folder, subfolder)
@@ -290,12 +301,16 @@ for subfolder in subfolders:
     if should_crop_into_four == 'y':
         crop_into_four()
 
+    # TODO: Move into main loop
     # Get grain size/density from images in subdirectory or cropped folder path
-    lower_limit = 2
     mean_grain_size, mean_grain_density = get_grain_size_grain_density_and_ellipse_lower_limit(
         image_folder_path, file_names)
 
+    # -------------------------------------------------------------------
     # Resizing images, getting and filling metadata into excel file & csv
+    # -------------------------------------------------------------------
+
+    # Initializing index variable, i
     i = first_empty_row
 
     # Initializing images' row and column location on the slab
@@ -309,7 +324,7 @@ for subfolder in subfolders:
 
         # Getting row number
         row_changed = 0
-        if should_crop_into_four == 'y':
+        if should_crop_into_four == 'y' and number_of_columns:
             if (file_names.index(filename)/4) % int(number_of_columns) == 0 and file_names.index(filename) != 0:
                 row += 1
                 row_changed = 1
@@ -331,6 +346,8 @@ for subfolder in subfolders:
                     col += 1
             elif should_crop_into_four == 'n' and row_changed != 1:
                 col += 1
+        else:
+            row = 0
 
         image_file_path = os.path.join(image_folder_path, filename)
         extension = os.path.splitext(filename)[-1]
@@ -343,30 +360,33 @@ for subfolder in subfolders:
             processed_file_name = subject_id + r"_" + str(slab_id) + r"_" + str(row) + r"_" + str(col) + str(extension)
         processed_file_path = os.path.join(processed_folder_path, processed_file_name)
 
-        # creating PIL instance
+        # Creating PIL instance
         pil_file = Image.open(image_file_path)
         image_exif = pil_file.info['exif']
 
-        # drawing scale bar on image
+        # Threshold glare
+        # TBD
+
+        # Drawing scale bars on image
         draw_scale_bars(processed_file_path, pil_file, image_exif, lower_limit)
 
-        # resizing, saving to new folder
+        # Resizing, saving to new folder
         resize_to_limit(processed_file_path)
 
-        # getting image exif data
+        # Getting image exif data
         exif = {ExifTags.TAGS[k]: v for k, v in pil_file._getexif().items() if k in ExifTags.TAGS}
         get_date(exif)
         get_gps(exif)
 
-        # writing image information into excel & csv files
-        write_metadata_into_excel()
+        # Writing image information into excel & csv files
+        # write_metadata_into_excel() # TODO: uncomment
         write_metadata_into_csv()
 
-        print('{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)))
+        print('\r{} of {} images processed.'.format((file_names.index(filename) + 1), len(file_names)), end="")
         i += 1
         crop_count += 1
 
-    # save excel manifest --- the excel file must be closed
+    # Save excel manifest --- Note: the excel file must be closed
     wb.save(excel_file_path)
 
     # Executing terminal commands to upload images
@@ -375,6 +395,7 @@ for subfolder in subfolders:
         os.system(cmd)
         print('\nExperiment subjects uploaded.')
 
+    # TODO: delete
     make_sims = input('\nPress enter to begin creating simulations...')
 
     # Number of sims/negs created per folder; 5 for beta, 3 otherwise
@@ -384,7 +405,8 @@ for subfolder in subfolders:
     sim_file_paths = create_sims_from_process_images(processed_folder_path, upload_now, lower_limit, max_sample,
                                                      simulation_set_id_=simulation_set_id)
 
-    make_negs = input('\nPress enter to begin creating confirmed negatives...')
+    # TODO: delete
+    make_negs = input('\nPress enter to begin creating confirmed negatives (NOTE: to close the window, press any key --- do not X-out.)...')
 
     # Running confirm_negative.py (script to make confirmed negative images)
     create_negs_from_process_images(processed_folder_path, upload_now, max_sample, negative_set_id_=negative_set_id)
@@ -394,10 +416,17 @@ if upload_now == 'y':
     if need_new_sim == 'y' or need_new_neg == 'y':
         config_designator(simulation_set_id, negative_set_id)
 
+# TODO: delete
 # Update manifests on GitHub
 input('\nPress enter to push manifests...')
 update_manifests()
 
+# TODO: Make automatic
 print('\nProcessing completed. Go to project builder if you\'d like to update the active subject sets.')
 
 # set active subject sets
+# simulations appearance
+# calculate area lost to glare (& large dark patches?)
+# have simulations avoid glare areas
+# for beta: create more images via inversion/rotation
+
