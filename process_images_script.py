@@ -16,6 +16,7 @@ from git import Repo
 from imutils import perspective, contours, grab_contours
 from panoptes_client import Panoptes, Project, SubjectSet, \
     Workflow
+from panoptes_client.panoptes import PanoptesAPIException
 from scipy.spatial import distance
 from skimage.util import img_as_ubyte
 
@@ -78,9 +79,9 @@ class ProcessImages:
             self.simulation_set_id, self.need_new_sim = self.configure_subject_set('simulation', self.subject_set_ids)
             self.negative_set_id, self.need_new_neg = self.configure_subject_set('negative', self.subject_set_ids)
 
-            # Configuring designator for new subject sets (if any are made)
-            if self.need_new_sim == 'y' or self.need_new_neg == 'y':
-                self.configure_designator()
+            # Configuring designator for selected/created subject sets (possibly redundant, but not time consuming)
+            self.configure_designator()
+
         else:
             self.experiment_set_id = None
             self.simulation_set_id = None
@@ -167,13 +168,18 @@ class ProcessImages:
                 # Getting the image's total glare area and a list of its glare pixels
                 self.total_glare_area, self.glare_pixels = self.get_glare_area(self.exp_pil_img)
 
+                # Resizing the image to the Zooniverse recommended 600MB and saving changes
+                self.exp_pil_img = self.resize_to_limit(self.exp_pil_img, self.exp_image_file_path)
+
                 # TODO: TEMPORARY
                 # Drawing scale bars on the image (if specified)
                 if self.should_draw_scale_bars == 'y':
-                    self.exp_pil_img = self.draw_scale_bars(self.exp_pil_img, self.exp_image_file_path)
-
+                    self.exp_pil_img = self.draw_scale_bars(self.exp_pil_img, self.exp_image_file_path, 10)
                 # Resizing the image to the Zooniverse recommended 600MB and saving changes
                 self.exp_pil_img = self.resize_to_limit(self.exp_pil_img, self.exp_image_file_path)
+
+                # Getting image's updated (post-resizing) millimeters per pixel ratio
+                self.mm_per_pixel = self.get_mm_per_pixel(self.exp_image_file_path)
 
                 # Getting data and GPS info from the image's exif data
                 self.exif_dict = {ExifTags.TAGS[k]: j for k, j in self.exp_pil_img._getexif().items() if
@@ -182,7 +188,7 @@ class ProcessImages:
                 self.latitude_longitude = self.get_gps_exif()
 
                 # Writing the image's metadata into the experiment manifest and experiment CSV
-                self.exp_metadata_list = [self.exp_subject_id, str(image_file_name), self.warehouse_name, self.location,
+                self.exp_metadata_list = [self.exp_subject_id, str(self.exp_file_name), self.warehouse_name, self.location,
                                           self.granite_type, self.slab_id,
                                           self.date.replace("\"", "") if self.date is not None else "",
                                           str(self.latitude_longitude[0]) + ", " + str(self.latitude_longitude[1])
@@ -203,13 +209,11 @@ class ProcessImages:
             # Saving experiment manifest
             self.exp_wb.save(self.exp_manifest_path)
 
-            # TODO: PROGRAM STALLS HERE; extra (attempted simulation?) images are saved to main Slab 3 folder
-
             # Creating simulation images
-            self.image_file_names_sample_sims = random.sample(self.image_file_names, self.training_images_per_folder)
+            self.image_file_names_sample_sims = random.sample(self.get_file_names(self.exp_folder_path), self.training_images_per_folder)
             for image_file_name in self.image_file_names_sample_sims:
                 # Getting the image's file path
-                self.image_file_path = os.path.join(self.current_folder_path, image_file_name)
+                self.image_file_path = os.path.join(self.exp_folder_path, image_file_name)
 
                 # Assigning a simulation subject ID
                 self.sim_subject_id = 's' + str(self.sim_i - 1)
@@ -227,7 +231,7 @@ class ProcessImages:
                 # TODO: TEMPORARY
                 # If scale bars were drawn, redrawing them to ensure than they were not covered by a simulation
                 if self.should_draw_scale_bars == 'y':
-                    self.sim_pil_img = self.draw_scale_bars(self.sim_pil_img, self.sim_image_file_path)
+                    self.sim_pil_img = self.draw_scale_bars(self.sim_pil_img, self.sim_image_file_path, 8)
 
                 # Resizing the image to the Zooniverse recommended 600MB and saving changes
                 self.sim_pil_img = self.resize_to_limit(self.sim_pil_img, self.sim_image_file_path)
@@ -235,10 +239,14 @@ class ProcessImages:
                 # Writing the image's metadata into the simulation manifest and simulation CSV
                 self.sim_metadata_list = [self.sim_subject_id, self.sim_image_file_name, self.sim_feedback_id,
                                           self.ellipse_center_coordinates[0], self.ellipse_center_coordinates[1],
-                                          self.ellipse_axes_lengths[0], self.ellipse_axes_lengths[1],
+                                          int(self.ellipse_axes_lengths[0]/self.mm_per_pixel),
+                                          int(self.ellipse_axes_lengths[1]/self.mm_per_pixel),
                                           self.ellipse_angle, self.major_to_minor_axes_ratio]
                 self.write_metadata_into_manifest(self.sim_ws, self.sim_i, self.sim_metadata_list)
                 self.write_metadata_into_CSV(self.sim_csv_file_path, self.sim_metadata_fields, self.sim_metadata_list)
+
+                if self.image_file_names_sample_sims.index(image_file_name) == 0:
+                    print("")
 
                 # Printing status
                 print('\r{} of {} simulations made.'.format(
@@ -252,10 +260,10 @@ class ProcessImages:
             self.sim_wb.save(self.sim_manifest_path)
 
             # Creating negative images
-            self.image_file_names_sample_negs = random.sample(self.image_file_names, self.training_images_per_folder)
+            self.image_file_names_sample_negs = random.sample(self.get_file_names(self.exp_folder_path), self.training_images_per_folder)
             for image_file_name in self.image_file_names_sample_negs:
                 # Getting the image's file path
-                self.image_file_path = os.path.join(self.current_folder_path, image_file_name)
+                self.image_file_path = os.path.join(self.exp_folder_path, image_file_name)
 
                 # Assigning a negative subject ID
                 self.neg_subject_id = 'n' + str(self.neg_i - 1)
@@ -280,11 +288,6 @@ class ProcessImages:
                                           self.classification]
                 self.write_metadata_into_manifest(self.neg_ws, self.neg_i, self.neg_metadata_list)
                 self.write_metadata_into_CSV(self.neg_csv_file_path, self.neg_metadata_fields, self.neg_metadata_list)
-
-                # # Printing status
-                # print('\r{} of {} negatives examined.'.format(
-                #     (self.image_file_names_sample_negs.index(image_file_name) + 1),
-                #     len(self.image_file_names_sample_negs)), end="")
 
                 # Updating indexing variable
                 self.neg_i += 1
@@ -319,14 +322,28 @@ class ProcessImages:
                                                                              self.sim_csv_file_path)
         neg_upload_cmd = 'panoptes subject-set upload-subjects {} {}'.format(self.negative_set_id,
                                                                              self.neg_csv_file_path)
-        os.system(exp_upload_cmd)
-        os.system(sim_upload_cmd)
-        os.system(neg_upload_cmd)
-        print('\n Subjects uploaded.')
+        print("")
+        try:
+            os.system(exp_upload_cmd)
+            print('Experiment subjects uploaded.')
+        except:
+            print('Error uploading EXPERIMENT subjects; upload manually.')
+        try:
+            os.system(sim_upload_cmd)
+            print('Simulation subjects uploaded.')
+        except:
+            print('Error uploading SIMULATION subjects; upload manually.')
+        try:
+            os.system(neg_upload_cmd)
+            print('Negative subjects uploaded.')
+        except:
+            print('Error uploading NEGATIVE subjects; upload manually.')
 
     def create_negative(self, image_file_name, pil_img):
         # Printing status
-        print('\nDisplaying image {} of {}'.format(self.image_file_names_sample_negs.index(image_file_name) + 1,
+        if self.image_file_names_sample_negs.index(image_file_name) == 0:
+            print("\n\nMaking negative images...")
+        print('Displaying image {} of {}'.format(self.image_file_names_sample_negs.index(image_file_name) + 1,
                                                  len(self.image_file_names_sample_negs)))
         # Displaying the sampled image
         plt.imshow(pil_img)
@@ -347,7 +364,7 @@ class ProcessImages:
             pos_file_name = r"pos_" + image_file_name
             pos_file_path = os.path.join(self.pos_folder_path, pos_file_name)
             pil_img.save(pos_file_path)
-            print('\nThe image has been saved to the "positives folder."')
+            print('\nThe image has been saved to the "positives folder."\n')
 
         return pil_img, contains_melt_patch, classification
 
@@ -523,7 +540,7 @@ class ProcessImages:
 
         return pil_img
 
-    def draw_scale_bars(self, pil_img, image_file_path):
+    def draw_scale_bars(self, pil_img, image_file_path, thickness):
         pix_width, pix_height = pil_img.size
         draw = ImageDraw.Draw(pil_img)
         # Setting scale bar color, length, and number
@@ -542,8 +559,8 @@ class ProcessImages:
         topBottom_coords = [tuple(topBottom_start_coords), tuple(topBottom_end_coords)]
         # Drawing scale bars
         for j in range(1, number_of_scale_bars + 1):
-            draw.line(leftRight_coords, fill=scale_bars_color, width=10)
-            draw.line(topBottom_coords, fill=scale_bars_color, width=10)
+            draw.line(leftRight_coords, fill=scale_bars_color, width=thickness)
+            draw.line(topBottom_coords, fill=scale_bars_color, width=thickness)
             leftRight_start_coords[1] += (2 * leftRight_bars_center)
             topBottom_start_coords[0] += (2 * topBottom_bars_center)
             if j % 2 != 0:
@@ -806,7 +823,7 @@ class ProcessImages:
         granite_type = input('Granite type: ')
         slab_id = input('Slab ID: ')
         number_of_columns = input('Number of Columns: ')
-        print('\n')
+        print("")
 
         # warehouse_name = 'United Stone International'
         # location = 'Solon, Ohio'
@@ -829,7 +846,7 @@ class ProcessImages:
     def configure_CSVs(self):
         exp_csv_file_name = 'experiment_subjects.csv'
         exp_metadata_fields_list = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
-                                    '#date_time', '#latitude_longitude', 'grain_density',
+                                    '#date_time', '#latitude_longitude', '#grain_density',
                                     '#grain_stats(mm)(number_of_grains, '
                                     'mean_grain_size, median_grain_size, grain_size_25_percentile, grain_size_75_percentile)',
                                     '#glare_area(mm^2)', '#number_of_columns']
@@ -903,6 +920,7 @@ class ProcessImages:
         zoonv_workflow.configuration[
             'subject_queue_page_size'] = 10  # determines how many subjects are loaded in queue at one time
 
+        # TODO: CHANGE to 15?
         # Training subjects are not retired, experiment subjects are retired via SWAP/Caesar
         zoonv_workflow.retirement['criteria'] = 'never_retire'
 
@@ -926,7 +944,7 @@ class ProcessImages:
             subject_set_ids.append(subject_set_id)
             subject_set_names.append(subject_set_name)
         print(
-            "\n".join("{} --- {}".format(ss_id, ss_name) for ss_id, ss_name in zip(subject_set_ids, subject_set_names)))
+            "\n".join(u"{} \u2014 {}".format(ss_id, ss_name) for ss_id, ss_name in zip(subject_set_ids, subject_set_names)))
         return subject_set_ids
 
     def configure_subject_set(self, subject_type, subject_set_ids):
@@ -934,16 +952,18 @@ class ProcessImages:
         zoonv_project, zoonv_workflow = self.configure_zooniverse()
 
         # Selecting an existing subject set or creating a new one based on user input
-        need_new_set = input(f"\nWould you like to create a new {subject_type.upper()} subject set? [y/n]: ")
+        if subject_type == 'experiment':
+            print("")
+        need_new_set = input(f"Would you like to create a new {subject_type.upper()} subject set? [y/n]: ")
         while need_new_set != 'y' and need_new_set != 'n':
-            print('Please enter \'y\' or \'no\'... ')
+            print("Please enter \'y\' or \'no\'...")
             need_new_set = input(f"\nWould you like to create a new {subject_type.upper()} subject set? [y/n]: ")
         if need_new_set == 'n':
-            subject_set_id = input('    Enter the ID of the existing set you\'d like to upload to: ')
+            subject_set_id = input("    Enter the ID of the existing set you\'d like to upload to: ")
             while (int(subject_set_id) in subject_set_ids) is False:
-                subject_set_id = input('    This ID does not exist; please enter a new one: ')
+                subject_set_id = input("    This ID does not exist; please enter a new one: ")
         else:
-            subject_set_name = input('    Enter a name for the new subject set: ')
+            subject_set_name = input("    Enter a name for the new subject set: ")
             subject_set = SubjectSet()
             subject_set.links.project = zoonv_project
             subject_set.display_name = subject_set_name
