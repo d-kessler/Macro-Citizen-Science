@@ -134,7 +134,6 @@ class ProcessImages:
                 self.current_folder_path, self.image_file_names = self.crop_into_four()
 
             # Initializing indexing variables and other variables used to position images on the slab
-            # self.i = self.exp_first_empty_row
             self.exp_i = self.exp_first_empty_row
             self.sim_i = self.sim_first_empty_row
             self.neg_i = self.neg_first_empty_row
@@ -188,8 +187,8 @@ class ProcessImages:
                 self.latitude_longitude = self.get_gps_exif()
 
                 # Writing the image's metadata into the experiment manifest and experiment CSV
-                self.exp_metadata_list = [self.exp_subject_id, str(self.exp_file_name), self.warehouse_name, self.location,
-                                          self.granite_type, self.slab_id,
+                self.exp_metadata_list = [self.exp_subject_id, str(self.exp_file_name), str(image_file_name),
+                                          self.warehouse_name, self.location, self.granite_type, self.slab_id,
                                           self.date.replace("\"", "") if self.date is not None else "",
                                           str(self.latitude_longitude[0]) + ", " + str(self.latitude_longitude[1])
                                           if self.latitude_longitude is not None else "",
@@ -764,7 +763,10 @@ class ProcessImages:
     @staticmethod
     def configure_pil_img(image_file_path):
         pil_img = Image.open(image_file_path)
-        image_exif = pil_img.info['exif']
+        try:
+            image_exif = pil_img.info['exif']
+        except KeyError:
+            image_exif = pil_img.getexif()
 
         return pil_img, image_exif
 
@@ -774,7 +776,10 @@ class ProcessImages:
             cropped_file_path = os.path.join(self.cropped_folder_path, file_name)
             extension = os.path.splitext(file_name)[-1]
             pil_img = Image.open(image_file_path)
-            image_exif = pil_img.info['exif']
+            try:
+                image_exif = pil_img.info['exif']
+            except KeyError:
+                image_exif = pil_img.getexif()
             width, height = pil_img.size
             half_width = width / 2
             half_height = height / 2
@@ -818,10 +823,15 @@ class ProcessImages:
 
     @staticmethod
     def configure_exp_metadata():
+        print("")
         warehouse_name = input('Warehouse name: ')
         location = input('Location (City, State): ')
         granite_type = input('Granite type: ')
         slab_id = input('Slab ID: ')
+        if '|' or '/' or '\\' in slab_id:
+            slab_id = slab_id.replace('|', '-')
+            slab_id = slab_id.replace('/', '-')
+            slab_id = slab_id.replace('\\', '-')
         number_of_columns = input('Number of Columns: ')
         print("")
 
@@ -845,7 +855,8 @@ class ProcessImages:
 
     def configure_CSVs(self):
         exp_csv_file_name = 'experiment_subjects.csv'
-        exp_metadata_fields_list = ['!subject_id', '#file_name', '#warehouse', '#location', '#granite_type', '#slab_id',
+        exp_metadata_fields_list = ['!subject_id', '#file_name', '#original_file_name', '#warehouse', '#location',
+                                    '#granite_type', '#slab_id',
                                     '#date_time', '#latitude_longitude', '#grain_density',
                                     '#grain_stats(mm)(number_of_grains, '
                                     'mean_grain_size, median_grain_size, grain_size_25_percentile, grain_size_75_percentile)',
