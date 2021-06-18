@@ -1,0 +1,6 @@
+!subject_id,#file_name,#training_subject,#feedback_1_id,#feedback_1_x,#feedback_1_y,#feedback_1_toleranceA,#feedback_1_toleranceB,#feedback_1_theta,#major_to_minor_ratio
+s6,s6_e276_4321_1_4_UnitedStoneInternational_Cleveland_OH_.jpeg,True,meltpatch,1082,993,57,28,106,2
+s7,s7_e280_4321_2_7_UnitedStoneInternational_Cleveland_OH_.jpeg,True,meltpatch,578,189,57,28,77,2
+s8,s8_e275_4321_1_3_UnitedStoneInternational_Cleveland_OH_.jpeg,True,meltpatch,1247,269,57,28,104,2
+s9,s9_e279_4321_1_7_UnitedStoneInternational_Cleveland_OH_.jpeg,True,meltpatch,870,980,57,28,27,2
+s10,s10_e277_4321_1_5_UnitedStoneInternational_Cleveland_OH_.jpeg,True,meltpatch,1211,751,57,28,64,2
